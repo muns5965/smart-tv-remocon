@@ -243,6 +243,9 @@ def main():
         print("  d 50 / a 50 / s 50 / w 50  → 오른쪽/왼쪽/아래/위로 50 이동")
         print("  wheel 3 / wheel -3          → 스크롤 (방향 확인)")
         print("  click                       → 현재 위치 클릭 (주의)")
+        print("  enter                       → 확인 버튼 (커서가 보일 때 커서 위치 선택되는지)")
+        print("  press                       → 누름·뗌 방식 클릭 (move down:1 → down:0)")
+        print("  click2                      → click을 move 직후에 보냄")
         print("  q                           → 종료")
         dirs = {"d": (1, 0), "a": (-1, 0), "s": (0, 1), "w": (0, -1)}
         while True:
@@ -256,6 +259,16 @@ def main():
             elif c == "wheel":
                 p.send_text("type:scroll\ndx:0\ndy:%d\n\n" % n)
             elif c == "click":
+                p.send_text("type:click\n\n")
+            elif c == "enter":
+                p.send_text("type:button\nname:ENTER\n\n")
+            elif c == "press":
+                p.send_text("type:move\ndx:0\ndy:0\ndown:1\n\n")
+                time.sleep(0.08)
+                p.send_text("type:move\ndx:0\ndy:0\ndown:0\n\n")
+            elif c == "click2":
+                p.send_text("type:move\ndx:1\ndy:0\ndown:0\n\n")
+                time.sleep(0.03)
                 p.send_text("type:click\n\n")
             else:
                 print("모르는 명령")
