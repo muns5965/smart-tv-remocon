@@ -20,6 +20,10 @@ TV에 설치된 앱의 이름과 ID를 출력하고, 번호를 고르면 TV에�
 TV IP 확인: TV 설정 → 전체 설정 → 네트워크 → 연결된 Wi-Fi → 고급 설정.
 `https://TV_IP:3001`을 브라우저로 열어 `Hello world`가 나오면 TV 쪽은 준비된 것이다.
 
+### TV 찾기 확인 도구 (`tools/ssdp_find_tv.py`)
+SSDP로 같은 Wi-Fi의 LG TV를 찾아 IP·이름·모델을 출력한다. 앱 3단계(자동 찾기) 전에 실제 TV 응답을 확인하는 디버그 도구.
+안 나오면 `all` 옵션으로 다른 기기의 응답 여부를 본다 (공유기가 멀티캐스트를 막는지 판별).
+
 ### 2. 안드로이드 앱 (1단계: 화면 골격)
 - `main`에 push하면 GitHub Actions가 APK를 빌드한다 → Actions 실행 화면 → Artifacts에서 받기.
 - 아직 TV 통신은 없다 (2단계).
