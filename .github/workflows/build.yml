@@ -31,7 +31,8 @@ jobs:
           set -e
           export KEY_PASSWORD="$KEYSTORE_PASSWORD"
           if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            # 붙여넣기 때 섞인 공백·줄바꿈 제거 후 디코딩
+            printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/release.jks"
             export KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
             gradle --no-daemon :app:assembleRelease
             SRC=app/build/outputs/apk/release/app-release.apk
