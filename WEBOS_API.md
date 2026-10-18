@@ -98,6 +98,8 @@ name:UP
 - 클릭: `type:click\n\n` **단독으로는 실TV 무반응** (2026-10-19). 직전에 `type:move`를 보내야 동작:
   `type:move\ndx:1\ndy:0\ndown:0\n\n` → 30ms 뒤 `type:click\n\n` — 실TV ✅ (`lg_pointer_test.py`의 `click2`)
   → 앱은 탭할 때 항상 이 순서로 보낸다 (커서가 숨겨진 상태에서 클릭이 무시되는 것으로 추정)
+- 커서가 보이는 상태에서 `type:button\nname:ENTER\n\n`(확인 버튼)도 커서 위치를 선택 — 실TV ✅ (`enter`)
+  → 리모컨의 '확인'은 커서가 보일 때 클릭과 같은 효과 (매직 리모컨과 동일)
 - 스크롤: `type:scroll\ndx:0\ndy:<n>\n\n` (공개 앱 코드, 방향 실TV 확인 중)
 - 이동 배율: 150씩 4번(=600)에 화면 가로 거의 끝까지 → 화면 가로 ≈ 600~650 단위 (실TV)
 - 커서 이동: `type:move\ndx:<n>\ndy:<n>\ndown:0\n\n` — 실TV ✅ (2026-10-19, `tools/lg_pointer_test.py`: 10씩 15번 → 네모 그림)
