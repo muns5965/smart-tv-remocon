@@ -199,6 +199,20 @@ class WebOsClientTest {
     }
 
     @Test
+    fun pointer_move_click_scroll_formats() {
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        assertTrue(c.pointerMove(12, -7))
+        assertTrue(c.pointerClick())
+        assertTrue(c.pointerScroll(10))
+        assertEquals("type:move\ndx:12\ndy:-7\ndown:0\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        assertEquals("type:click\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        assertEquals("type:scroll\ndx:0\ndy:10\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        c.disconnect()
+    }
+
+    @Test
     fun rejectedKey_clearsAndRePairsWithPin() {
         val c = client()
         c.connect("tvA", server.hostName, "bad-key", null)

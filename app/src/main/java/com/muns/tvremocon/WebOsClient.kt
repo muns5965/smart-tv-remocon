@@ -141,8 +141,22 @@ class WebOsClient(
     }
 
     /** 방향키 등 (UP, DOWN, LEFT, RIGHT, ENTER, BACK, HOME ...) */
-    fun button(name: String): Boolean {
-        val text = "type:button\nname:$name\n\n"
+    fun button(name: String): Boolean = sendPointer("type:button\nname:$name\n\n")
+
+    /**
+     * 커서 이동 (실TV: 화면 가로 ≈ 600~650 단위, WEBOS_API.md 4절).
+     * 클릭은 단독으로 무시되므로 호출자가 move 직후(약 30ms)에 pointerClick을 보낸다.
+     */
+    fun pointerMove(dx: Int, dy: Int): Boolean =
+        sendPointer("type:move\ndx:$dx\ndy:$dy\ndown:0\n\n")
+
+    fun pointerClick(): Boolean = sendPointer("type:click\n\n")
+
+    /** 스크롤 (실TV: 10부터 반응, 양수 = 위) */
+    fun pointerScroll(dy: Int): Boolean = sendPointer("type:scroll\ndx:0\ndy:$dy\n\n")
+
+    /** 포인터 소켓으로 전송. 아직 안 열렸으면 대기열(최대 5)에 넣고 소켓을 요청 */
+    private fun sendPointer(text: String): Boolean {
         synchronized(lock) {
             val s = cur ?: return false
             if (!s.connected) return false

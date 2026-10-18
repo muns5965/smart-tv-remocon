@@ -27,7 +27,7 @@ class AndroidBridge(
     fun appInfo(): String = JSONObject()
         .put("version", BuildConfig.VERSION_NAME)
         .put("build", BuildConfig.VERSION_CODE)
-        .put("stage", 2)
+        .put("stage", 3)
         .put("pairing", "PIN")
         .toString()
 
@@ -98,6 +98,16 @@ class AndroidBridge(
 
     @JavascriptInterface
     fun button(name: String): Boolean = client.button(name)
+
+    // 터치패드 (ARCHITECTURE.md 3절). 클릭 타이밍(move → 30ms → click)은 화면 쪽에서 맞춘다
+    @JavascriptInterface
+    fun pointerMove(dx: Int, dy: Int): Boolean = client.pointerMove(dx, dy)
+
+    @JavascriptInterface
+    fun pointerClick(): Boolean = client.pointerClick()
+
+    @JavascriptInterface
+    fun pointerScroll(dy: Int): Boolean = client.pointerScroll(dy)
 
     @JavascriptInterface
     fun sendPin(pin: String) {
