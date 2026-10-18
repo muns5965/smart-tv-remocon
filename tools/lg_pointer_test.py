@@ -246,6 +246,8 @@ def main():
         print("  enter                       → 확인 버튼 (커서가 보일 때 커서 위치 선택되는지)")
         print("  press                       → 누름·뗌 방식 클릭 (move down:1 → down:0)")
         print("  click2                      → click을 move 직후에 보냄")
+        print("  wheel2 3 / wheel2 -3        → move 직후 스크롤 (값도 바꿔 보기: 1, 10, 30)")
+        print("  wheel3 3                    → move 직후 스크롤을 5번 연속 (휠을 여러 칸 돌린 것처럼)")
         print("  q                           → 종료")
         dirs = {"d": (1, 0), "a": (-1, 0), "s": (0, 1), "w": (0, -1)}
         while True:
@@ -266,6 +268,12 @@ def main():
                 p.send_text("type:move\ndx:0\ndy:0\ndown:1\n\n")
                 time.sleep(0.08)
                 p.send_text("type:move\ndx:0\ndy:0\ndown:0\n\n")
+            elif c in ("wheel2", "wheel3"):
+                p.send_text("type:move\ndx:1\ndy:0\ndown:0\n\n")
+                time.sleep(0.03)
+                for _ in range(5 if c == "wheel3" else 1):
+                    p.send_text("type:scroll\ndx:0\ndy:%d\n\n" % n)
+                    time.sleep(0.05)
             elif c == "click2":
                 p.send_text("type:move\ndx:1\ndy:0\ndown:0\n\n")
                 time.sleep(0.03)
