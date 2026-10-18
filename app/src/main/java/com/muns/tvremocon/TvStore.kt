@@ -49,24 +49,12 @@ class TvStore(context: Context) {
      */
     fun upsertFound(tv: TvInfo): Boolean = synchronized(lock) {
         val all = load()
-        val cur = all.optJSONObject(tv.id) ?: JSONObject()
-        if (tv.id.startsWith("uuid:")) {
-            val manualId = "ip:${tv.ip}"
-            val manual = all.optJSONObject(manualId)
-            if (manual != null) {
-                if (cur.optString("key").isEmpty()) cur.put("key", manual.optString("key"))
-                if (cur.optString("cert").isEmpty()) cur.put("cert", manual.optString("cert"))
-                all.remove(manualId)
-                if (prefs.getString("last", "") == manualId) prefs.edit().putString("last", tv.id).apply()
-            }
-        }
-        cur.put("ip", tv.ip)
-        if (tv.name.isNotEmpty()) cur.put("name", tv.name)
-        if (tv.model.isNotEmpty()) cur.put("model", tv.model)
-        if (tv.uuid.isNotEmpty()) cur.put("uuid", tv.uuid)
-        all.put(tv.id, cur)
+        val r = TvMerge.upsertFound(all, tv)          // 판단은 TvMerge (단위 테스트로 고정)
         save(all)
-        cur.optString("key").isNotEmpty()
+        if (r.migratedFrom != null && prefs.getString("last", "") == r.migratedFrom) {
+            prefs.edit().putString("last", tv.id).apply()
+        }
+        r.known
     }
 
     private fun setField(id: String, field: String, value: String?) {

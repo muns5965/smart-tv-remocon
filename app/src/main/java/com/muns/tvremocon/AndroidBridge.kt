@@ -150,7 +150,7 @@ class AndroidBridge(
     }
 
     override fun onResponse(tag: String, reqId: String, ok: Boolean, payload: JSONObject?, error: String?) {
-        val d = JSONObject().put("reqId", reqId).put("ok", ok)
+        val d = JSONObject().put("reqId", reqId).put("ok", ok).put("id", tag)   // 어느 TV의 응답인지
         if (payload != null) d.put("payload", payload)
         if (error != null) d.put("error", error)
         emit("response", d)

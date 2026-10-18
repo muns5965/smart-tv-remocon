@@ -3,6 +3,7 @@ package com.muns.tvremocon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.ServerSocket
 import kotlin.concurrent.thread
@@ -85,6 +86,56 @@ class SsdpSearchTest {
         srv.close()
         assertEquals("GET / HTTP/1.0", requestLine)
         assertEquals("[LG] webOS TV OLED42C3KNA" to "OLED42C3KNA", r)
+    }
+
+    // ---- 응답 형식 검사 (3차 검토)
+
+    @Test
+    fun rejectsBadStatusLine_andPartialSt() {
+        assertNull(SsdpSearch.parse(real.replace("HTTP/1.1 200 OK", "NOTIFY * HTTP/1.1"), "192.168.8.219"))
+        assertNull(SsdpSearch.parse(real.replace("HTTP/1.1 200 OK", "HTTP/1.1 404 Not Found"), "192.168.8.219"))
+        // ST가 대상 문자열을 '포함'만 하는 경우는 거부 (정확히 일치해야 함)
+        assertNull(SsdpSearch.parse(real.replace("ST: urn:lge-com:service:webos-second-screen:1", "ST: x-urn:lge-com:service:webos-second-screen:1-fake"), "192.168.8.219"))
+    }
+
+    @Test
+    fun badUuid_becomesIpEntry_notLinkedToExistingTv() {
+        val longUuid = "a".repeat(65)
+        listOf("d3d5<script>", longUuid, "").forEach { bad ->
+            val pkt = real.replace("d3d5b624-f443-c293-d320-d79150ded2b7", bad)
+            val tv = SsdpSearch.parse(pkt, "192.168.8.219")!!.first
+            assertEquals("ip:192.168.8.219", tv.id)
+            assertEquals("", tv.uuid)
+        }
+    }
+
+    @Test
+    fun tooLongLocation_isDropped_butTvKept() {
+        val pkt = real.replace("http://192.168.8.219:1474/", "http://192.168.8.219:1474/" + "x".repeat(300))
+        val r = SsdpSearch.parse(pkt, "192.168.8.219")!!
+        assertEquals("uuid:d3d5b624-f443-c293-d320-d79150ded2b7", r.first.id)
+        assertNull(r.second)
+    }
+
+    /** 연결은 받지만 아무 응답도 안 하는 서버 → 전체 마감 안에 끝나야 함, 예약도 남지 않아야 함 */
+    @Test
+    fun fetchDescription_honorsOverallDeadline() {
+        val srv = ServerSocket(0)
+        val hold = thread { try { srv.accept().use { Thread.sleep(5000) } } catch (e: Exception) { } }
+        val t0 = System.currentTimeMillis()
+        val r = SsdpSearch.fetchDescription("http://127.0.0.1:${srv.localPort}/", "127.0.0.1", 800)
+        val took = System.currentTimeMillis() - t0
+        srv.close()
+        hold.interrupt()
+        assertNull(r)
+        assertTrue("took $took ms", took < 1500)
+        assertEquals(0, SsdpSearch.DESC_TIMER.queue.size)
+    }
+
+    @Test
+    fun fetchDescription_leavesNoTimerAfterSuccess() {
+        fetchDescription_overPlainSocket()
+        assertEquals(0, SsdpSearch.DESC_TIMER.queue.size)
     }
 
     @Test

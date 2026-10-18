@@ -7,6 +7,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URI
 import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
@@ -49,6 +50,7 @@ class WebOsClient(
         var pointer: WebSocket? = null
         var pointerOpen = false
         var pointerRequested = false
+        var pointerBlocked = false          // TV가 준 포인터 주소가 이상하면 이 세션에서는 다시 요청하지 않음
         val pendingButtons = ArrayList<String>()
         var connected = false
         var sentKey = false
@@ -159,7 +161,7 @@ class WebOsClient(
     private fun sendPointer(text: String): Boolean {
         synchronized(lock) {
             val s = cur ?: return false
-            if (!s.connected) return false
+            if (!s.connected || s.pointerBlocked) return false
             val p = s.pointer
             if (p != null && s.pointerOpen) return p.send(text)
             if (s.pendingButtons.size < 5) s.pendingButtons.add(text)
@@ -216,8 +218,16 @@ class WebOsClient(
             REGISTER_ID -> handleRegister(s, sock, type, payload, m.optString("error"))
             POINTER_ID -> {
                 val path = payload?.optString("socketPath").orEmpty()
-                if (type != "error" && path.isNotEmpty()) {
+                if (type != "error" && path.isNotEmpty() && isSamePointerTarget(path, s.host)) {
                     openPointer(s, path)
+                } else if (type != "error" && path.isNotEmpty()) {
+                    // 세션과 다른 스킴·호스트·포트 → 접속하지 않고 이 세션에서는 포인터 차단 (오류는 한 번만)
+                    synchronized(lock) {
+                        s.pointerBlocked = true
+                        s.pointerRequested = false
+                        s.pendingButtons.clear()
+                    }
+                    listener.onPointerError(s.tag, "TV가 알려 준 방향키 주소가 올바르지 않아 연결하지 않았습니다")
                 } else {
                     val hadPending = synchronized(lock) {
                         s.pointerRequested = false
@@ -270,6 +280,7 @@ class WebOsClient(
 
     /** lock 안에서 호출 */
     private fun requestPointerLocked(s: Session) {
+        if (s.pointerBlocked) return
         val sock = s.ws ?: return
         s.pointerRequested = true
         sock.send(
@@ -345,7 +356,24 @@ class WebOsClient(
             .build()
     }
 
+    /** 포인터 주소가 지금 세션과 같은 스킴·호스트·포트인지 (URL 파서로 분리 비교) */
+    private fun isSamePointerTarget(socketPath: String, sessionHost: String): Boolean =
+        isSameTarget(socketPath, scheme, sessionHost, port)
+
     companion object {
+        /**
+         * 실TV 주소 형식: wss://<TV_IP>:3001/resources/<고유값>/netinput.pointer.sock (WEBOS_API.md 4절)
+         * 스킴·호스트·포트가 모두 같아야 true. 경로는 TV가 정하는 값이라 검사하지 않는다.
+         */
+        fun isSameTarget(url: String, scheme: String, host: String, port: Int): Boolean {
+            val u = try { URI(url.trim()) } catch (e: Exception) { return false }
+            if (!scheme.equals(u.scheme, ignoreCase = true)) return false
+            val h = (u.host ?: return false).removePrefix("[").removeSuffix("]")
+            if (!h.equals(host.removePrefix("[").removeSuffix("]"), ignoreCase = true)) return false
+            val p = if (u.port > 0) u.port else if (u.scheme.equals("wss", true)) 443 else 80
+            return p == port
+        }
+
         const val REGISTER_ID = "register_0"
         const val POINTER_ID = "ptr_0"
         const val PIN_ID = "pin_0"

@@ -296,7 +296,13 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   }
 
   // ------------------------------------------------------------ 연결 흐름
+  // TV를 바꿀 때 이전 TV에 보낸 요청은 조용히 정리 ("응답 없음" 토스트가 잘못 뜨지 않게)
+  function clearPending() {
+    Object.keys(pending).forEach(function (k) { clearTimeout(pending[k].timer); });
+    pending = {};
+  }
   function connectTv(tv) {
+    clearPending();
     S.tv = { id: tv.id, ip: tv.ip, name: tv.name || "" };
     S.conn = "connecting";
     render();
@@ -378,6 +384,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     else if (type === "tvFound") onFound(d);
     else if (type === "discoverDone") onDiscoverDone(d);
     else if (type === "response") {
+      if (d.id && S.tv && S.tv.id && d.id !== S.tv.id) return;   // 다른 TV의 응답은 무시
       var p = pending[d.reqId];
       if (p) { delete pending[d.reqId]; clearTimeout(p.timer); p.cb(d); }
     } else if (type === "error") toast(d.message || "오류");
@@ -480,6 +487,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
         var ipEl = $("ip"), ip = ipEl ? ipEl.value.trim() : "";
         if (!ip) { toast("IP를 입력하세요"); break; }
         closeSheet();
+        clearPending();
         S.tv = { id: "", ip: ip, name: "" };
         S.conn = "connecting"; S.phase = "";
         render();

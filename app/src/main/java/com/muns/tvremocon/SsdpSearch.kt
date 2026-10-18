@@ -8,6 +8,8 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URI
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /** 찾은 TV. id는 uuid가 있으면 "uuid:<값>", 없으면 "ip:<IP>" */
 data class TvInfo(
@@ -74,21 +76,42 @@ class SsdpSearch(private val st: String = ST_LG) {
     companion object {
         const val ST_LG = "urn:lge-com:service:webos-second-screen:1"
         private const val MAX_DESC_BYTES = 64 * 1024
-        private const val DESC_TIMEOUT_MS = 2000
+        private const val MAX_HEADER_BYTES = 8 * 1024
+        private const val MAX_LOCATION_LEN = 256
+        const val DESC_TIMEOUT_MS = 2000L
+        private val UUID_RE = Regex("^[0-9A-Za-z-]{1,64}$")
+        private val STATUS_RE = Regex("^HTTP/1\\.[01] 200\\b")
+
+        /**
+         * 설명 조회 마감 감시용 공유 스케줄러 (데몬 1개). 조회마다 "마감 시 소켓 닫기"를 예약하고
+         * finally에서 취소한다 → 정상 완료 후 남는 예약 없음 (removeOnCancelPolicy).
+         */
+        internal val DESC_TIMER = ScheduledThreadPoolExecutor(1) { r ->
+            Thread(r, "ssdp-desc-deadline").apply { isDaemon = true }
+        }.apply { removeOnCancelPolicy = true }
 
         /** 응답 패킷 → (TvInfo, LOCATION). 대상 ST가 아니면 null */
+        /**
+         * 검색 응답 검사 (UPnP 규격 형식):
+         * 첫 줄 "HTTP/1.x 200", ST 정확히 일치. 아니면 null.
+         * uuid가 형식에 안 맞으면 uuid 없이 "ip:" 항목(새 기기)으로 — 기존 TV의 키와 묶이지 않게.
+         * LOCATION이 너무 길면 버리고 TV는 이름 없이 유지.
+         */
         fun parse(packet: String, fromIp: String, st: String = ST_LG): Pair<TvInfo, String?>? {
+            val lines = packet.split("\r\n", "\n")
+            if (!STATUS_RE.containsMatchIn(lines.firstOrNull()?.trim() ?: "")) return null
             val headers = HashMap<String, String>()
-            packet.split("\r\n", "\n").drop(1).forEach { line ->
+            lines.drop(1).forEach { line ->
                 val i = line.indexOf(':')
                 if (i > 0) headers[line.substring(0, i).trim().uppercase()] = line.substring(i + 1).trim()
             }
-            val gotSt = headers["ST"] ?: headers["NT"] ?: return null
-            if (!gotSt.contains(st)) return null
+            if (headers["ST"] != st) return null
             val usn = headers["USN"] ?: ""
-            val uuid = if (usn.startsWith("uuid:")) usn.removePrefix("uuid:").substringBefore("::") else ""
+            val raw = if (usn.startsWith("uuid:")) usn.removePrefix("uuid:").substringBefore("::") else ""
+            val uuid = if (UUID_RE.matches(raw)) raw else ""
             val id = if (uuid.isNotEmpty()) "uuid:$uuid" else "ip:$fromIp"
-            return TvInfo(id = id, ip = fromIp, uuid = uuid) to headers["LOCATION"]
+            val loc = headers["LOCATION"]?.takeIf { it.length <= MAX_LOCATION_LEN }
+            return TvInfo(id = id, ip = fromIp, uuid = uuid) to loc
         }
 
         /**
@@ -118,32 +141,46 @@ class SsdpSearch(private val st: String = ST_LG) {
                 Regex("^[0-9A-Fa-f]{0,4}(:[0-9A-Fa-f]{0,4}){2,7}(%[0-9A-Za-z_.-]+)?$").matches(s)
 
         /** LOCATION XML → (friendlyName, modelNumber 또는 modelName). 실패 시 null */
-        fun fetchDescription(location: String, fromIp: String): Pair<String, String>? {
+        /**
+         * 설명 XML 조회. 연결·헤더·본문을 합쳐 [DESC_TIMEOUT_MS] 안에 끝낸다:
+         * 하나의 마감 시각으로 연결/읽기 대기 시간을 남은 시간만큼만 주고,
+         * 마감 시각에 소켓을 강제로 닫는 예약을 걸어 절대 마감을 보장한다.
+         * 실패(강제 종료 포함)는 null — 호출자는 TV를 이름 없이 유지.
+         */
+        fun fetchDescription(location: String, fromIp: String, timeoutMs: Long = DESC_TIMEOUT_MS): Pair<String, String>? {
             val (addr, port, path) = checkLocation(location, fromIp) ?: return null
-            return try {
-                Socket().use { s ->
-                    s.connect(InetSocketAddress(addr, port), DESC_TIMEOUT_MS)
-                    s.soTimeout = DESC_TIMEOUT_MS
-                    val hostHeader = if (addr.address.size == 16) "[${addr.hostAddress}]" else addr.hostAddress
-                    s.getOutputStream().write(
-                        ("GET $path HTTP/1.0\r\nHost: $hostHeader:$port\r\n" +
-                            "Connection: close\r\n\r\n").toByteArray()
-                    )
-                    val input = s.getInputStream()
-                    val out = ByteArrayOutputStream()
-                    val buf = ByteArray(4096)
-                    val deadline = System.currentTimeMillis() + DESC_TIMEOUT_MS
-                    while (out.size() < MAX_DESC_BYTES && System.currentTimeMillis() < deadline) {
-                        val n = input.read(buf, 0, minOf(buf.size, MAX_DESC_BYTES - out.size()))
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                    }
-                    val text = out.toString("UTF-8")
-                    val status = text.substringBefore("\r\n")
-                    if (!status.contains(" 200")) null else parseDescription(text.substringAfter("\r\n\r\n"))
+            val deadline = System.currentTimeMillis() + timeoutMs
+            fun remaining(): Int = (deadline - System.currentTimeMillis()).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            val s = Socket()
+            val closeAtDeadline = Runnable { try { s.close() } catch (e: Exception) { } }   // Runnable 명시: Callable과 겹침 방지
+            val watchdog = DESC_TIMER.schedule(closeAtDeadline, timeoutMs, TimeUnit.MILLISECONDS)
+            try {
+                s.connect(InetSocketAddress(addr, port), remaining().coerceAtLeast(1))
+                val hostHeader = if (addr.address.size == 16) "[${addr.hostAddress}]" else addr.hostAddress
+                s.getOutputStream().write(
+                    ("GET $path HTTP/1.0\r\nHost: $hostHeader:$port\r\nConnection: close\r\n\r\n").toByteArray()
+                )
+                val input = s.getInputStream()
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(4096)
+                while (out.size() < MAX_DESC_BYTES) {
+                    val left = remaining()
+                    if (left <= 0) return null
+                    s.soTimeout = left
+                    val n = input.read(buf, 0, minOf(buf.size, MAX_DESC_BYTES - out.size()))
+                    if (n < 0) break
+                    out.write(buf, 0, n)
                 }
+                val text = out.toString("UTF-8")
+                val headerEnd = text.indexOf("\r\n\r\n")
+                if (headerEnd < 0 || headerEnd > MAX_HEADER_BYTES) return null
+                if (!STATUS_RE.containsMatchIn(text.substringBefore("\r\n"))) return null
+                return parseDescription(text.substring(headerEnd + 4))
             } catch (e: Exception) {
-                null
+                return null
+            } finally {
+                watchdog.cancel(false)
+                try { s.close() } catch (e: Exception) { }
             }
         }
 

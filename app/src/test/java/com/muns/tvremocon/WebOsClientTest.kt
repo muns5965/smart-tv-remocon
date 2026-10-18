@@ -30,6 +30,7 @@ class WebOsClientTest {
     private val pointerTexts = LinkedBlockingQueue<String>()
     private val tvReceived = LinkedBlockingQueue<String>()
     @Volatile private var pointerFails = false
+    @Volatile private var pointerPath: String? = null     // null이면 정상 주소
 
     private val listener = object : WebOsClient.Listener {
         override fun onState(tag: String, state: String, message: String) { events.add("state:$tag:$state:$message") }
@@ -79,7 +80,7 @@ class WebOsClientTest {
                     }
                     "ssap://com.webos.service.networkinput/getPointerInputSocket" -> webSocket.send(
                         if (pointerFails) """{"type":"error","id":"$id","error":"500 no pointer"}"""
-                        else """{"type":"response","id":"$id","payload":{"returnValue":true,"socketPath":"wss://${server.hostName}:${server.port}/pointer"}}"""
+                        else """{"type":"response","id":"$id","payload":{"returnValue":true,"socketPath":"${pointerPath ?: "wss://${server.hostName}:${server.port}/pointer"}"}}"""
                     )
                     "ssap://bad/uri" -> webSocket.send("""{"type":"error","id":"$id","error":"404 no such service"}""")
                     else -> webSocket.send("""{"type":"response","id":"$id","payload":{"returnValue":true}}""")
@@ -257,6 +258,36 @@ class WebOsClientTest {
         assertTrue(c.button("UP"))              // 대기열에 넣고 다시 요청 → 실패
         await("pointerError:tvA")
         c.disconnect()
+    }
+
+    private fun badPointer(path: String) {
+        pointerPath = path
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        await("pointerError:tvA")                 // 연결 직후 자동 요청에서 차단, 오류 1회
+        assertFalse(c.button("UP"))                 // 이후 이 세션에서는 포인터 차단
+        assertFalse(c.pointerMove(5, 5))
+        assertNull(pointerTexts.poll(500, TimeUnit.MILLISECONDS))
+        c.disconnect()
+    }
+
+    @Test
+    fun pointerPath_otherHost_isRefused() = badPointer("wss://127.0.0.2:${server.port}/pointer")
+
+    @Test
+    fun pointerPath_otherPort_isRefused() = badPointer("wss://${server.hostName}:1/pointer")
+
+    @Test
+    fun pointerPath_plainWs_isRefused() = badPointer("ws://${server.hostName}:${server.port}/pointer")
+
+    @Test
+    fun sameTargetCheck_matchesRealTvFormat() {
+        assertTrue(WebOsClient.isSameTarget(
+            "wss://192.168.8.219:3001/resources/bb05cde3d83ccbcb183c901177d05e315e770b9f/netinput.pointer.sock",
+            "wss", "192.168.8.219", 3001))
+        assertFalse(WebOsClient.isSameTarget("wss://192.168.8.219/x", "wss", "192.168.8.219", 3001))
+        assertFalse(WebOsClient.isSameTarget("not a url", "wss", "192.168.8.219", 3001))
     }
 
     @Test
