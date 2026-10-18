@@ -47,9 +47,18 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")   // 2단계 WebOsClient에서 사용
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")   // WebOsClient
+
+    // 단위 테스트: 가짜 TV(MockWebServer, TLS)로 WebOsClient·SsdpSearch 검증
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
+    testImplementation("org.json:json:20240303")         // 안드로이드 org.json 스텁 대신 실제 구현
 }
