@@ -35,6 +35,7 @@
 | 1 | 문서, `tools/lg_tv_apps.py`, 빈 앱(WebView + 화면 골격), Actions 빌드 | 완료 |
 | 2 | `WebOsClient` + 브리지: 인증 → 앱 실행·볼륨·음소거·재생·전원·방향키 | 진행 (실TV 확인 대기) |
 | 3 | `TvDiscovery`(SSDP): TV 자동 찾기 — 실TV 응답 확인 후 2단계에 합침 | 진행 (실TV 확인 대기) |
+| 3+ | 설정 시트 정리, 터치패드(커서 이동·클릭·스크롤) — 포인터 형식은 `tools/lg_pointer_test.py`로 실TV 확인 | 진행 (앱 실TV 확인 대기) |
 | 이후 | 앱 전체 목록, 문자 입력, 외부입력, 전원 켜기(WoL), 다른 제조사 | 미정 |
 
 ### 파일
@@ -47,6 +48,13 @@
 | `TvStore.kt` | TV별 키·인증서·이름 저장 (SharedPreferences) | 있음 |
 | `AndroidBridge.kt` | JS ↔ Kotlin, 위 클래스 연결 | 있음 |
 | `assets/index.html` | 화면, 자동 연결 흐름 | — |
+
+### 화면 구성 (index.html)
+- 상단 한 줄: TV 이름 · 상태 · ⚙. 상태를 누르면 끊겼을 때 다시 연결, 연결돼 있으면 설정
+- ⚙ 설정 시트: 저장된 TV(연결 / 두 번 눌러 등록 해제), TV 찾기, IP 직접 입력, 터치패드 커서 속도, 버전
+- 가운데: [방향키 | 터치패드] 전환 (선택은 localStorage `ctrl_mode`)
+  - 터치패드: 드래그 = 이동(속도 × 가속, 20ms마다 모아 전송), 탭 = 이동 1 → 30ms → 클릭, 두 손가락 위아래 24px마다 스크롤 ±10 (아래로 끌기 = 위쪽 내용)
+  - 커서 속도 기본 1.5 (localStorage `cursor_speed`, 0.6~3.0)
 
 ### 자동 연결 흐름 (index.html)
 1. 마지막 TV(`lastTv()`)가 있으면 바로 `connect(id)`
@@ -71,6 +79,9 @@
 | `disconnect()` | 없음 | `state: closed` |
 | `request(reqId, uri, payloadJson)` | ssap 요청 | `response` |
 | `button(name)` | `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` … | 동기: 전송/대기열 성공 여부 |
+| `pointerMove(dx, dy)` | 터치패드 커서 이동 (TV 단위, 화면 가로 ≈ 600~650) | 동기: 성공 여부 |
+| `pointerClick()` | 클릭. **단독으로는 TV가 무시** → 화면이 `pointerMove(1,0)` 후 30ms 뒤 호출 | 동기 |
+| `pointerScroll(dy)` | 스크롤. 10 단위, 양수 = 위 | 동기 |
 | `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
 | `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
