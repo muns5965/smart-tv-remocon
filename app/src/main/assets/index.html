@@ -240,18 +240,25 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       "에 연결 요청을 보냈습니다. 처음 한 번만 하면 됩니다.</p>" +
       '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
   }
+  // 처음 등록: TV 화면에 뜬 숫자를 입력 (리모컨 불필요). 길이 제한 없음, 숫자만
   function showPin(msg) {
-    openSheet("pin", "<h2>PIN 입력</h2><p>" + esc(msg || "TV 화면에 표시된 숫자를 입력하세요.") + "</p>" +
-      '<div style="display:flex;gap:8px"><input id="pin" inputmode="numeric" maxlength="8">' +
+    var wrong = msg && msg.indexOf("맞지 않") >= 0;
+    openSheet("pin", "<h2>TV 화면의 숫자 입력</h2><p>" +
+      esc(wrong ? msg + " 다시 입력하세요." : tvLabel(S.tv) + " 화면에 표시된 숫자를 입력하세요. 처음 한 번만 하면 됩니다.") + "</p>" +
+      '<div style="display:flex;gap:8px"><input id="pin" inputmode="numeric" pattern="[0-9]*" autocomplete="off">' +
       '<button class="btn-acc" data-act="sendPin">확인</button></div>' +
-      '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
+      '<div class="acts"><button class="btn-sm" data-act="usePrompt">숫자가 안 뜨면: TV에서 허용</button>' +
+      '<button class="btn-sm" data-act="cancel">취소</button></div>');
     setTimeout(function () { var p = $("pin"); if (p) p.focus(); }, 50);
   }
-  function showCertChanged() {
-    openSheet("cert", "<h2>TV 인증서가 바뀌었습니다</h2><p>" + esc(tvLabel(S.tv) + " (" + (S.tv ? S.tv.ip : "") + ")") +
-      "의 보안 인증서가 지난번과 다릅니다. TV를 초기화했거나 업데이트했다면 정상입니다. 같은 TV가 맞을 때만 계속하세요.</p>" +
+  // 인증서가 바뀜: 기존 키는 보내지 않고, 다시 등록하면 진짜 TV 화면에만 숫자가 뜬다
+  function showCertChanged(d) {
+    var who = tvLabel(S.tv) + (d && d.model ? " · " + d.model : "") + " (" + (S.tv ? S.tv.ip : "") + ")";
+    openSheet("cert", "<h2>TV 인증서가 바뀌었습니다</h2><p>" + esc(who) +
+      "의 보안 인증서가 지난번과 다릅니다. TV를 초기화·업데이트했다면 정상일 수 있습니다.</p>" +
+      "<p>다시 등록을 누르면 <b>TV 화면에 숫자</b>가 떠야 합니다. 숫자가 안 뜨면 다른 기기일 수 있으니 취소하세요.</p>" +
       '<div class="acts"><button class="btn-sm" data-act="close">취소</button>' +
-      '<button class="btn-acc btn-sm" data-act="acceptCert">같은 TV 맞음 · 다시 연결</button></div>');
+      '<button class="btn-acc btn-sm" data-act="acceptCert">다시 등록</button></div>');
   }
 
   // ------------------------------------------------------------ 연결 흐름
@@ -271,6 +278,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   }
 
   function onState(d) {
+    // 다른 TV로 바꾼 뒤 늦게 온 이전 TV의 이벤트는 무시
+    if (d.id && S.tv && S.tv.id && d.id !== S.tv.id) return;
     var prev = S.conn;
     S.conn = d.state;
     if (d.id) S.tv = { id: d.id, ip: d.ip, name: d.name || (S.tv && S.tv.name) || "" };
@@ -289,7 +298,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
         showPin(d.message);
         break;
       case "failed":
-        if (d.code === "cert_changed") { S.phase = ""; showCertChanged(); break; }
+        if (d.code === "cert_changed") { S.phase = ""; showCertChanged(d); break; }
         if (S.sheet === "prompt" || S.sheet === "pin") closeSheet();
         if (S.phase === "last") {           // 마지막 TV 실패 → 자동 검색
           S.phase = "discover";
@@ -418,7 +427,12 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
         break;
       case "close": closeSheet(); break;
       case "cancel": closeSheet(); B.disconnect(); break;
-      case "sendPin": var pin = $("pin"); if (pin && pin.value.trim()) B.sendPin(pin.value.trim()); break;
+      case "sendPin":
+        var pin = $("pin"), v = pin ? pin.value.replace(/\D/g, "") : "";
+        if (!v) { toast("TV 화면의 숫자를 입력하세요"); break; }
+        B.sendPin(v);
+        break;
+      case "usePrompt": closeSheet(); if (S.tv && S.tv.id) { S.conn = "connecting"; render(); B.connectPrompt(S.tv.id); } break;
       case "acceptCert": closeSheet(); if (S.tv) { B.acceptCert(S.tv.id); connectTv(S.tv); } break;
       case "mute": toggleMute(); break;
       case "power": power(); break;

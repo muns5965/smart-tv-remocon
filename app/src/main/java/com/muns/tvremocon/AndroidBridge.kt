@@ -18,8 +18,7 @@ class AndroidBridge(
     private val discovery = TvDiscovery(activity)
     private val client = WebOsClient(this)
 
-    @Volatile private var currentId = ""
-    @Volatile private var currentIp = ""
+    @Volatile private var currentId = ""      // forget() 판단용. 저장에는 쓰지 않음
     @Volatile private var released = false
 
     // ------------------------------------------------------------ JS → Kotlin
@@ -29,6 +28,7 @@ class AndroidBridge(
         .put("version", BuildConfig.VERSION_NAME)
         .put("build", BuildConfig.VERSION_CODE)
         .put("stage", 2)
+        .put("pairing", "PIN")
         .toString()
 
     /** 저장된 TV 목록: [{id, ip, name, model, known}] */
@@ -58,27 +58,27 @@ class AndroidBridge(
         )
     }
 
-    /** 저장된 TV id로 연결 */
+    /** 저장된 TV id로 연결. 새 등록이면 PIN 방식 (리모컨 불필요, 실TV 확인) */
     @JavascriptInterface
     fun connect(id: String) {
-        val tv = store.get(id)
-        if (tv == null) {
-            emit("error", JSONObject().put("message", "저장된 TV가 없습니다: $id"))
-            return
-        }
-        startConnect(id, tv)
+        startConnect(id, WebOsClient.PAIRING_PIN)
     }
 
-    /** IP 직접 입력으로 연결 */
+    /** PIN이 안 뜨는 TV용: 'TV에서 허용' 방식으로 다시 연결 */
+    @JavascriptInterface
+    fun connectPrompt(id: String) {
+        startConnect(id, WebOsClient.PAIRING_PROMPT)
+    }
+
+    /** IP 직접 입력으로 연결 (IPv4·IPv6 표기만) */
     @JavascriptInterface
     fun connectIp(ip: String) {
         val clean = ip.trim()
-        if (!Regex("^[0-9A-Za-z.:\\-]+$").matches(clean)) {
-            emit("error", JSONObject().put("message", "IP 형식이 아닙니다: $ip"))
+        if (!SsdpSearch.isIpLiteral(clean)) {
+            emit("error", JSONObject().put("message", "IP 주소 형식이 아닙니다: $ip"))
             return
         }
-        val id = store.ensureManual(clean)
-        startConnect(id, store.get(id) ?: JSONObject().put("ip", clean))
+        startConnect(store.ensureManual(clean), WebOsClient.PAIRING_PIN)
     }
 
     @JavascriptInterface
@@ -104,10 +104,14 @@ class AndroidBridge(
         client.sendPin(pin.trim())
     }
 
-    /** 인증서가 바뀐 TV를 같은 TV로 인정 (저장된 지문 삭제 후 다음 연결에서 새로 저장) */
+    /**
+     * 인증서가 바뀐 TV를 다시 등록: 지문과 함께 client-key도 지운다.
+     * → 바뀐 상대에게 기존 키를 보내지 않고, TV 화면의 PIN으로 새로 등록 (PIN은 진짜 TV 화면에만 뜸)
+     */
     @JavascriptInterface
     fun acceptCert(id: String) {
         store.setCert(id, null)
+        store.setKey(id, null)
     }
 
     @JavascriptInterface
@@ -117,52 +121,65 @@ class AndroidBridge(
     }
 
     // ------------------------------------------------------------ WebOsClient.Listener
+    // 저장은 항상 콜백의 tag(=연결을 시작한 TV id) 기준. currentId를 쓰지 않는다 (연결이 겹칠 때 섞임 방지)
 
-    override fun onState(state: String, message: String) {
-        val tv = store.get(currentId)
+    override fun onState(tag: String, state: String, message: String) {
+        val tv = store.get(tag)
         emit(
             "state", JSONObject().put("state", state).put("message", message)
-                .put("id", currentId).put("ip", currentIp)
+                .put("id", tag).put("ip", tv?.optString("ip").orEmpty())
                 .put("name", tv?.optString("name").orEmpty())
         )
     }
 
-    override fun onRegistered(clientKey: String, certSha256: String?) {
-        val id = currentId
-        if (clientKey.isNotEmpty()) store.setKey(id, clientKey)
-        val saved = store.get(id)?.optString("cert").orEmpty()
-        if (saved.isEmpty() && !certSha256.isNullOrEmpty()) store.setCert(id, certSha256)
-        store.setLast(id)
+    override fun onRegistered(tag: String, clientKey: String, certSha256: String?) {
+        if (clientKey.isNotEmpty()) store.setKey(tag, clientKey)
+        val saved = store.get(tag)?.optString("cert").orEmpty()
+        if (saved.isEmpty() && !certSha256.isNullOrEmpty()) store.setCert(tag, certSha256)
+        store.setLast(tag)
     }
 
-    override fun onResponse(reqId: String, ok: Boolean, payload: JSONObject?, error: String?) {
+    override fun onResponse(tag: String, reqId: String, ok: Boolean, payload: JSONObject?, error: String?) {
         val d = JSONObject().put("reqId", reqId).put("ok", ok)
         if (payload != null) d.put("payload", payload)
         if (error != null) d.put("error", error)
         emit("response", d)
     }
 
-    override fun onKeyRejected() {
-        store.setKey(currentId, null)
+    override fun onKeyRejected(tag: String) {
+        store.setKey(tag, null)
     }
 
-    override fun onCertMismatch(actualSha256: String?) {
+    override fun onCertMismatch(tag: String, actualSha256: String?) {
+        val tv = store.get(tag)
         emit(
             "state", JSONObject().put("state", "failed").put("code", "cert_changed")
                 .put("message", "TV 인증서가 바뀌었습니다")
-                .put("id", currentId).put("ip", currentIp)
+                .put("id", tag).put("ip", tv?.optString("ip").orEmpty())
+                .put("name", tv?.optString("name").orEmpty())
+                .put("model", tv?.optString("model").orEmpty())
         )
+    }
+
+    override fun onPointerError(tag: String, message: String) {
+        emit("error", JSONObject().put("message", message))
     }
 
     // ------------------------------------------------------------ 내부
 
-    private fun startConnect(id: String, tv: JSONObject) {
+    private fun startConnect(id: String, pairingType: String) {
+        val tv = store.get(id)
+        if (tv == null) {
+            emit("error", JSONObject().put("message", "저장된 TV가 없습니다: $id"))
+            return
+        }
         currentId = id
-        currentIp = tv.optString("ip")
         client.connect(
-            currentIp,
+            id,
+            tv.optString("ip"),
             tv.optString("key").ifEmpty { null },
-            tv.optString("cert").ifEmpty { null }
+            tv.optString("cert").ifEmpty { null },
+            pairingType
         )
     }
 

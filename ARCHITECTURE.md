@@ -18,7 +18,7 @@
 │     ├─ TvDiscovery   SSDP 멀티캐스트로 TV 찾기                    │
 │     └─ KeyStore      TV별 client-key, TV 인증서 지문 저장         │
 └──────────────────────────────────────────────────────────────────┘
-                 │ 같은 Wi-Fi
+                 │ SSDP·wss가 통하는 로컬 네트워크 (IP 대역이 달라도 될 수 있음, WEBOS_API.md 6절)
                  ▼
             LG webOS TV
 ```
@@ -65,13 +65,14 @@
 | `savedTvs()` | 없음 | 동기: `[{"id","ip","name","model","known"}]` (키·인증서 값은 내보내지 않음) |
 | `lastTv()` | 없음 | 동기: 마지막 TV id 또는 `""` |
 | `discover()` | 없음 | `tvFound` (여러 번), `discoverDone` |
-| `connect(id)` | 저장된 TV id | `state` |
-| `connectIp(ip)` | IP 직접 입력 | `state` |
+| `connect(id)` | 저장된 TV id. 새 등록이면 **PIN** 방식 | `state` |
+| `connectPrompt(id)` | PIN이 안 뜨는 TV: 'TV에서 허용' 방식으로 다시 연결 | `state` |
+| `connectIp(ip)` | IP 직접 입력 (IPv4·IPv6 표기만, 호스트 이름 불가) | `state` |
 | `disconnect()` | 없음 | `state: closed` |
 | `request(reqId, uri, payloadJson)` | ssap 요청 | `response` |
 | `button(name)` | `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` … | 동기: 전송/대기열 성공 여부 |
 | `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
-| `acceptCert(id)` | 인증서 바뀐 TV를 같은 TV로 인정 | 저장된 지문 삭제 |
+| `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
@@ -82,7 +83,18 @@
 | `response` | `{"reqId","ok":true,"payload":{...}}` / `{"reqId","ok":false,"error":"..."}` |
 | `tvFound` | `{"id","ip","name","model","uuid","known"}` |
 | `discoverDone` | `{"count", "error"?}` |
-| `error` | `{"message"}` |
+| `error` | `{"message"}` — 방향키 소켓 실패도 여기로 |
+
+### 연결 세션과 저장 (검토 반영)
+- `WebOsClient`의 모든 콜백은 `connect()`에 준 **tag(=TV id)**를 돌려준다. 브리지는 키·지문 저장에 이 tag만 쓴다.
+  → A에 연결 중 B로 바꿔도 A의 늦은 결과가 B에 저장되지 않는다. 화면도 현재 TV가 아닌 id의 `state`는 무시.
+- 인증서 지문이 다르면 TLS 단계에서 끊으므로 저장된 client-key는 상대에게 전송되지 않는다.
+  다시 등록하면 **진짜 TV 화면에만** PIN이 뜨므로, 숫자가 안 뜨면 다른 기기로 판단할 수 있다.
+
+### 기기 설명(LOCATION) 조회
+- 안드로이드는 HTTP(cleartext)를 기본 차단한다. 앱 전체 정책은 차단 그대로 두고, 설명 XML만 **소켓으로 직접 GET**.
+- 조건: `http`만, 호스트는 IP 표기이고 **SSDP 응답을 보낸 IP와 같을 때만**, 2초·64KB 제한. 실패해도 TV는 이름 없이 목록에 남는다.
+- 검색은 3초 동안 응답만 모으고, 설명 XML은 그 뒤에 TV별로 받는다.
 
 ## 4. 저장 데이터 (SharedPreferences, 앱 내부)
 - `tv_store/tvs`: `{id → {ip, name, model, uuid, key, cert}}`
@@ -99,6 +111,8 @@
 - 이 앱 전용 키다 (다른 앱과 공유하지 않음). 원본 keystore는 저장소 밖에 백업한다.
 - 서명 키를 고정해야 업데이트가 덮어쓰기로 설치된다. debug APK와 release APK는 서로 덮어쓸 수 없다.
 - 결과 APK는 Actions 실행 화면의 Artifacts에서 받는다.
+- `versionCode`는 `GITHUB_RUN_NUMBER`. **워크플로 파일을 새로 만들거나 이름을 바꾸면 번호가 1부터 다시 시작**해 덮어쓰기 설치가 막힌다 → 그럴 때는 `app/build.gradle.kts`에서 기준값을 더해 준다.
+- 빌드 전에 단위 테스트(`testDebugUnitTest`)를 돌리고, 실패하면 원인을 Actions 주석(annotation)으로 남긴다.
 
 ## 6. 공개 저장소 주의
 - 이 저장소는 public이다. TV IP, client-key, keystore, Secrets 값은 커밋하지 않는다 (`.gitignore`).

@@ -44,7 +44,14 @@
 2. 사용자가 TV에서 허용 → `{"type":"registered","id":"register_0","payload":{"client-key":"..."}}`
 3. `client-key`를 저장해 두면 다음 접속부터 허용 창 없이 바로 `registered`
 
-- `pairingType: "PIN"`이 오는 TV도 있음 → `ssap://pairing/setPin` `{"pin":"..."}`로 응답 (실TV 미확인, 공개 앱 코드에서 확인)
+### PIN 방식 (리모컨 없이 등록) — 실TV 확인 (2026-10-19, OLED42C3KNA)
+- 요청 payload의 `pairingType`을 `"PIN"`으로 보내면 TV 화면에 **숫자**가 뜬다 ('허용' 창 대신)
+- TV 응답: `{"type":"response","id":"register_0","payload":{"pairingType":"PIN","returnValue":true}}`
+- 앱이 `{"id":"pin_0","type":"request","uri":"ssap://pairing/setPin","payload":{"pin":"<숫자>"}}` 전송
+- 맞으면 곧바로 `{"type":"registered","id":"register_0","payload":{"client-key":"..."}}`
+- 확인 당시 PIN은 **8자리**. 다른 모델은 길이가 다를 수 있으므로 앱은 길이 제한을 두지 않는다
+- 틀린 PIN 응답 형식은 실TV 미확인 (앱은 `type:error` 또는 `returnValue:false`를 둘 다 "틀림"으로 처리)
+- **앱의 새 등록 기본값은 PIN**, PIN이 안 뜨는 TV는 PROMPT로 전환
 - 저장된 키가 거부되면 `type: "error"` → 키를 지우고 다시 register
 
 ## 3. 요청 (ssap)

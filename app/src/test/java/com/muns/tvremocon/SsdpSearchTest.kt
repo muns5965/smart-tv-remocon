@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 
 class SsdpSearchTest {
 
@@ -42,5 +44,51 @@ class SsdpSearchTest {
         val xml = "<root><device><friendlyName>[LG] webOS TV OLED42C3KNA</friendlyName>" +
             "<modelName>LG Smart TV</modelName><modelNumber>OLED42C3KNA</modelNumber></device></root>"
         assertEquals("[LG] webOS TV OLED42C3KNA" to "OLED42C3KNA", SsdpSearch.parseDescription(xml))
+    }
+
+    // ---- LOCATION 검증 (검토 ③)
+
+    @Test
+    fun location_mustBeHttp_andSameHostAsResponder() {
+        assertNotNull(SsdpSearch.checkLocation("http://192.168.8.219:1474/", "192.168.8.219"))
+        assertNull(SsdpSearch.checkLocation("http://192.168.8.50:1474/", "192.168.8.219"))   // 다른 호스트
+        assertNull(SsdpSearch.checkLocation("https://192.168.8.219:1474/", "192.168.8.219")) // http만
+        assertNull(SsdpSearch.checkLocation("file:///etc/passwd", "192.168.8.219"))
+        assertNull(SsdpSearch.checkLocation("http://tv.local:1474/", "192.168.8.219"))       // 이름 조회 안 함
+        assertNull(SsdpSearch.checkLocation("not a url", "192.168.8.219"))
+        assertEquals(80, SsdpSearch.checkLocation("http://192.168.8.219/desc.xml", "192.168.8.219")!!.second)
+    }
+
+    @Test
+    fun ipLiteralCheck() {
+        listOf("192.168.8.219", "10.0.0.50", "::1", "fe80::1%wlan0").forEach { assertEquals(it, true, SsdpSearch.isIpLiteral(it)) }
+        listOf("256.1.1.1", "tv.local", "evil.com", "1.2.3", "").forEach { assertEquals(it, false, SsdpSearch.isIpLiteral(it)) }
+    }
+
+    /** 가짜 TV의 설명 XML을 소켓 GET으로 읽기 (안드로이드 HTTP 차단 우회 방식) */
+    @Test
+    fun fetchDescription_overPlainSocket() {
+        val srv = ServerSocket(0)
+        val body = "<root><device><friendlyName>[LG] webOS TV OLED42C3KNA</friendlyName>" +
+            "<modelNumber>OLED42C3KNA</modelNumber></device></root>"
+        var requestLine = ""
+        val t = thread {
+            srv.accept().use { s ->
+                requestLine = s.getInputStream().bufferedReader().readLine() ?: ""
+                s.getOutputStream().write(
+                    ("HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${body.toByteArray().size}\r\n\r\n$body").toByteArray()
+                )
+            }
+        }
+        val r = SsdpSearch.fetchDescription("http://127.0.0.1:${srv.localPort}/", "127.0.0.1")
+        t.join(3000)
+        srv.close()
+        assertEquals("GET / HTTP/1.0", requestLine)
+        assertEquals("[LG] webOS TV OLED42C3KNA" to "OLED42C3KNA", r)
+    }
+
+    @Test
+    fun fetchDescription_refusesOtherHost_withoutConnecting() {
+        assertNull(SsdpSearch.fetchDescription("http://127.0.0.2:1/", "127.0.0.1"))
     }
 }
