@@ -1,0 +1,17 @@
+# 빌드 산출물
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+# IDE
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+# 비밀값·개인 데이터 (공개 저장소)
+*.jks
+*.keystore
+lg_tv_key.json
+lg_tv_apps.json

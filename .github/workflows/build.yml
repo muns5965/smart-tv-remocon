@@ -1,0 +1,52 @@
+name: build-apk
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # 저장소에 gradle wrapper를 두지 않고 Actions에서 Gradle을 받아 쓴다
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+            gradle --no-daemon :app:assembleRelease
+            SRC=app/build/outputs/apk/release/app-release.apk
+            KIND=release
+          else
+            echo "::warning::서명 Secrets가 없어 debug APK로 빌드합니다 (ARCHITECTURE.md 5절)"
+            gradle --no-daemon :app:assembleDebug
+            SRC=app/build/outputs/apk/debug/app-debug.apk
+            KIND=debug
+          fi
+          mkdir -p out
+          cp "$SRC" "out/smart-tv-remocon-${KIND}-${GITHUB_RUN_NUMBER}.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-tv-remocon-apk
+          path: out/*.apk
+          if-no-files-found: error
