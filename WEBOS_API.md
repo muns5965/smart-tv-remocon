@@ -72,16 +72,17 @@
 | 앱 실행 | `ssap://system.launcher/launch` | `{"id":"<앱ID>"}` | 실TV ✅ |
 | 볼륨 조회 | `ssap://audio/getVolume` | 없음 | 공개 앱 코드 |
 | 음소거 | `ssap://audio/setMute` | `{"mute":true}` | 공개 앱 코드 |
-| 볼륨 업/다운 | `ssap://audio/volumeUp`, `ssap://audio/volumeDown` | 없음 | 공개 앱 코드 |
-| 전원 끄기 | `ssap://system/turnOff` | 없음 | 공개 앱 코드 |
+| 볼륨 업/다운 | `ssap://audio/volumeUp`, `ssap://audio/volumeDown` | 없음 | 실TV ✅ (앱) |
+| 전원 끄기 | `ssap://system/turnOff` | 없음 | 실TV ✅ (앱) |
 | 전원 상태 | `ssap://com.webos.service.tvpower/power/getPowerState` | 없음 | 공개 앱 코드 |
-| 재생/일시정지 | `ssap://media.controls/play`, `.../pause` | 없음 | 공개 앱 코드 |
+| 재생/일시정지 | `ssap://media.controls/play`, `.../pause` | 없음 | 실TV ✅ (앱) |
 | 외부입력 목록 | `ssap://tv/getExternalInputList` | 없음 | 공개 앱 코드 |
 | 외부입력 전환 | `ssap://tv/switchInput` | `{"inputId":"HDMI_1"}` | 공개 앱 코드 |
 | 문자 입력 | `ssap://com.webos.service.ime/insertText` | `{"text":"...","replace":0}` | 공개 앱 코드 |
-| 포인터 소켓 | `ssap://com.webos.service.networkinput/getPointerInputSocket` | 없음 | 공개 앱 코드 (아래 4절) |
+| 포인터 소켓 | `ssap://com.webos.service.networkinput/getPointerInputSocket` | 없음 | 실TV ✅ (앱, 아래 4절) |
 
 "공개 앱 코드" = 플레이스토어 리모컨 앱(com.eltacrew.tvremote) 분석에서 확인. 실TV 확인 후 ✅로 바꾼다.
+"실TV ✅ (앱)" = 2026-10-19 이 앱 release-11로 OLED42C3KNA에서 확인.
 
 ## 4. 방향키·확인·뒤로 (포인터 소켓)
 
@@ -92,6 +93,7 @@ type:button
 name:UP
 
 ```
+- 실TV ✅ (2026-10-19, 앱): `UP` `DOWN` `LEFT` `RIGHT` `ENTER` 동작 확인
 - 버튼 이름: `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` `EXIT` `MENU` `INFO` `LIST` `0`~`9` `DASH` `RED` `GREEN` `YELLOW` `BLUE` (공개 앱 코드)
 - 클릭: `type:click\n\n`, 스크롤: `type:scroll\ndx:0\ndy:<n>\n\n`
 
