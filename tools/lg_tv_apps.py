@@ -5,6 +5,7 @@ LG webOS TV 설치 앱 ID 조회 (표준 라이브러리만 사용, pip 설치 �
 사용법
   python lg_tv_apps.py              -> IP를 물어봄
   python lg_tv_apps.py 192.168.0.10
+  python lg_tv_apps.py 192.168.0.10 pin   -> PIN 방식 등록 (리모컨 없이)
 
 PC(PyCharm)나 안드로이드 Pydroid 3 에서 그대로 실행하면 된다.
 처음 실행 때 TV 화면에 뜨는 연결 요청에서 '허용'을 누른다.
@@ -171,32 +172,57 @@ def request(ws, uri, payload=None):
             return p
 
 
-def register(ws, ip):
-    payload = {"forcePairing": False, "pairingType": "PROMPT",
+def register(ws, ip, mode="PROMPT"):
+    """mode: PROMPT = TV에서 '허용' 누르기, PIN = TV에 뜬 숫자를 여기 입력 (리모컨 불필요)
+    PIN 모드는 저장된 키를 쓰지 않고 새로 등록한다 (PIN 지원 여부 확인용)."""
+    payload = {"forcePairing": False, "pairingType": mode,
                "manifest": {"manifestVersion": 1, "appVersion": "1.0", "permissions": PERMS}}
-    key = load_key(ip)
+    key = load_key(ip) if mode == "PROMPT" else None
     if key:
         payload["client-key"] = key
         print("저장된 키로 인증 중…")
+    elif mode == "PIN":
+        print("PIN 방식으로 등록 요청 → TV 화면에 숫자가 뜨는지 보세요 (60초 대기)")
     else:
         print(">>> TV 화면에서 '허용'을 눌러 주세요 (60초 대기)")
     ws.send({"id": "register_0", "type": "register", "payload": payload})
+    got = ""                                  # TV가 실제로 고른 방식 (PIN / PROMPT)
     while True:
         r = ws.recv(timeout=60)
-        if r.get("id") != "register_0":
-            continue
-        t = r.get("type")
+        rid, t = r.get("id"), r.get("type")
         p = r.get("payload") or {}
+        if mode == "PIN":
+            print("  [TV 응답] %s" % json.dumps(r, ensure_ascii=False)[:300])   # 디버그: PIN 흐름 확인용
+        if rid == "pin_0":
+            if t == "error" or p.get("returnValue") is False:
+                print("PIN이 맞지 않습니다 (%s)" % (r.get("error") or p.get("errorText")))
+                pin = input(">>> PIN 다시 입력 (엔터 = 중단): ").strip()
+                if not pin:
+                    raise RuntimeError("PIN 입력 중단")
+                ws.send({"id": "pin_0", "type": "request", "uri": "ssap://pairing/setPin",
+                         "payload": {"pin": pin}})
+            continue
+        if rid != "register_0":
+            continue
         if t == "registered":
             k = p.get("client-key")
             if k and k != key:
                 save_key(ip, k)
-            print("인증 완료\n")
+            if mode == "PIN":
+                print("인증 완료 — %s\n" % ("PIN 방식 성공" if got == "PIN"
+                                            else "TV가 '허용' 방식으로 처리함 (PIN 미지원 가능성)"))
+            else:
+                print("인증 완료\n")
             return
+        if t == "response" and p.get("pairingType"):
+            got = p.get("pairingType")
         if t == "response" and p.get("pairingType") == "PIN":
             pin = input(">>> TV 화면에 뜬 PIN 입력: ").strip()
             ws.send({"id": "pin_0", "type": "request", "uri": "ssap://pairing/setPin",
                      "payload": {"pin": pin}})
+            continue
+        if t == "response" and p.get("pairingType") == "PROMPT" and mode == "PIN":
+            print("※ TV가 PIN 대신 '허용' 창을 띄웠습니다 → 이 TV는 PIN 방식을 지원하지 않을 수 있음")
             continue
         if t == "error":
             if key:
@@ -231,20 +257,25 @@ def get_apps(ws):
 
 
 def main():
-    ip = sys.argv[1] if len(sys.argv) > 1 else ""
+    args = [a for a in sys.argv[1:] if a.lower() != "pin"]
+    ip = args[0] if args else ""
     if not ip:
         ip = input("TV IP [%s]: " % DEFAULT_IP).strip() or DEFAULT_IP
     if not ip:
         print("TV IP를 입력하세요 (TV 설정 → 네트워크에서 확인)")
         return
-    print("접속: wss://%s:%d" % (ip, PORT))
+    mode = "PIN" if "pin" in [a.lower() for a in sys.argv[1:]] else ""
+    if not mode:
+        sel = input("등록 방식 [1 = TV에서 허용(기본), 2 = PIN 입력]: ").strip()
+        mode = "PIN" if sel == "2" else "PROMPT"
+    print("접속: wss://%s:%d (%s)" % (ip, PORT, mode))
     try:
         ws = WS(ip, PORT)
     except Exception as e:
         print("접속 실패: %s\n- 폰/PC와 TV가 같은 Wi-Fi인지, TV가 켜져 있는지 확인하세요." % e)
         return
     try:
-        register(ws, ip)
+        register(ws, ip, mode)
         apps = get_apps(ws)
         print("%-4s %-28s %s" % ("번호", "이름", "앱 ID"))
         print("-" * 70)
