@@ -70,8 +70,8 @@
 | 앱 목록(런처) | `ssap://com.webos.applicationManager/listLaunchPoints` | 없음 | 실TV ✅ 응답 `launchPoints[].id/title` |
 | 앱 목록(전체) | `ssap://com.webos.applicationManager/listApps` | 없음 | 공개 앱 코드 |
 | 앱 실행 | `ssap://system.launcher/launch` | `{"id":"<앱ID>"}` | 실TV ✅ |
-| 볼륨 조회 | `ssap://audio/getVolume` | 없음 | 공개 앱 코드 |
-| 음소거 | `ssap://audio/setMute` | `{"mute":true}` | 공개 앱 코드 |
+| 볼륨 조회 | `ssap://audio/getVolume` | 없음 | 실TV ✅ (앱, 음소거 토글에 사용) |
+| 음소거 | `ssap://audio/setMute` | `{"mute":true}` | 실TV ✅ (앱, 켜기·끄기) |
 | 볼륨 업/다운 | `ssap://audio/volumeUp`, `ssap://audio/volumeDown` | 없음 | 실TV ✅ (앱) |
 | 전원 끄기 | `ssap://system/turnOff` | 없음 | 실TV ✅ (앱) |
 | 전원 상태 | `ssap://com.webos.service.tvpower/power/getPowerState` | 없음 | 공개 앱 코드 |
