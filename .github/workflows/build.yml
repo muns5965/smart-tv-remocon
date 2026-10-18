@@ -25,11 +25,12 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # Secrets는 2개만 사용. alias는 고정값, 키 비밀번호는 keystore 비밀번호와 같음
+          KEY_ALIAS: tvremocon
         run: |
           set -e
-          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+          export KEY_PASSWORD="$KEYSTORE_PASSWORD"
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
             export KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
             gradle --no-daemon :app:assembleRelease

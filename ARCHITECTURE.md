@@ -70,8 +70,10 @@
 
 ## 5. 빌드와 서명
 - 로컬 Android 환경 없이 **GitHub Actions**(`.github/workflows/build.yml`)로 빌드한다.
-- Secrets 4개가 모두 있으면 그 키로 서명한 release APK, 없으면 debug APK를 만든다.
-  - `KEYSTORE_BASE64` (keystore 파일을 base64로), `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
+- Secrets 2개가 있으면 그 키로 서명한 release APK, 없으면 debug APK를 만든다.
+  - `KEYSTORE_BASE64` (keystore 파일을 base64로), `KEYSTORE_PASSWORD`
+  - alias는 `tvremocon`(워크플로에 고정), 키 비밀번호는 keystore 비밀번호와 같다.
+- 이 앱 전용 키다 (다른 앱과 공유하지 않음). 원본 keystore는 저장소 밖에 백업한다.
 - 서명 키를 고정해야 업데이트가 덮어쓰기로 설치된다. debug APK와 release APK는 서로 덮어쓸 수 없다.
 - 결과 APK는 Actions 실행 화면의 Artifacts에서 받는다.
 
