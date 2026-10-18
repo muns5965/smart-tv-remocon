@@ -93,7 +93,7 @@ type:button
 name:UP
 
 ```
-- 실TV ✅ (2026-10-19, 앱): `UP` `DOWN` `LEFT` `RIGHT` `ENTER` 동작 확인
+- 실TV ✅ (2026-10-19, 앱): `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` 동작 확인
 - 버튼 이름: `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` `EXIT` `MENU` `INFO` `LIST` `0`~`9` `DASH` `RED` `GREEN` `YELLOW` `BLUE` (공개 앱 코드)
 - 클릭: `type:click\n\n`, 스크롤: `type:scroll\ndx:0\ndy:<n>\n\n`
 
