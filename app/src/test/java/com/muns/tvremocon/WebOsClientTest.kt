@@ -38,6 +38,10 @@ class WebOsClientTest {
 
     /** 가짜 TV 본 소켓 */
     private val tv = object : WebSocketListener() {
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            webSocket.close(1000, null)                 // 실제 TV처럼 close에 응답
+        }
+
         override fun onMessage(webSocket: WebSocket, text: String) {
             tvReceived.add(text)
             val m = JSONObject(text)
@@ -68,6 +72,9 @@ class WebOsClientTest {
     private val pointerTv = object : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) { pointerTexts.add(text) }
         override fun onOpen(webSocket: WebSocket, response: Response) {}
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            webSocket.close(1000, null)
+        }
     }
 
     private fun registered(key: String) = """{"type":"registered","id":"register_0","payload":{"client-key":"$key"}}"""
@@ -85,7 +92,11 @@ class WebOsClientTest {
 
     @After
     fun tearDown() {
-        server.shutdown()
+        try {
+            server.shutdown()
+        } catch (e: java.io.IOException) {
+            // 소켓 정리 대기 시간 초과는 시나리오 결과와 무관
+        }
     }
 
     private fun fp() = WebOsClient.sha256(held.certificate.encoded)

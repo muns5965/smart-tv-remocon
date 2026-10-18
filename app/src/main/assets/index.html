@@ -13,21 +13,30 @@
 html,body{margin:0;background:var(--bg);color:var(--fg);
   font:15px/1.4 system-ui,-apple-system,"Noto Sans KR",sans-serif;user-select:none;-webkit-user-select:none}
 .wrap{max-width:440px;margin:0 auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom))}
-header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
+header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px}
 h1{font-size:18px;margin:0;font-weight:700}
-.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);color:var(--mut)}
+.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
 .pill::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mut);margin-right:6px;vertical-align:1px}
 .pill.on{color:var(--ok)} .pill.on::before{background:var(--ok)}
 .pill.wait{color:var(--warn)} .pill.wait::before{background:var(--warn)}
+.pill.bad{color:var(--err)} .pill.bad::before{background:var(--err)}
 
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
-.conn{display:flex;gap:8px}
-.conn input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px;font:inherit}
 button{font:inherit;color:var(--fg);background:var(--key);border:0;border-radius:12px;cursor:pointer;touch-action:manipulation}
 button:active{background:var(--key-hi);transform:scale(.97)}
+button:disabled{opacity:.45}
 .btn-acc{background:var(--acc);color:#fff;padding:10px 16px;font-weight:600}
 .btn-acc:active{background:#e23d6b}
+.btn-sm{padding:7px 12px;font-size:13px}
 .label{font-size:12px;color:var(--mut);margin:0 0 8px 2px}
+
+.tvbar{display:flex;align-items:center;gap:10px}
+.tvbar .who{flex:1;min-width:0}
+.tvbar .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvbar .sub{font-size:12px;color:var(--mut)}
+.manual{margin-top:10px;display:none;gap:8px}
+.manual.open{display:flex}
+input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px;font:inherit;user-select:text;-webkit-user-select:text}
 
 .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .app{height:54px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;line-height:1.2}
@@ -41,7 +50,7 @@ button:active{background:var(--key-hi);transform:scale(.97)}
 .dpad{position:relative;width:100%;max-width:230px;aspect-ratio:1;margin:0 auto;border-radius:50%;background:var(--key)}
 .dpad button{position:absolute;background:transparent;border-radius:0;font-size:22px;color:var(--mut)}
 .dpad button:active{color:var(--fg);background:rgba(255,255,255,.06)}
-.dpad .u{top:0;left:30%;width:40%;height:30%;border-radius:50% 50% 0 0/100% 100% 0 0}
+.dpad .u{top:0;left:30%;width:40%;height:30%}
 .dpad .d{bottom:0;left:30%;width:40%;height:30%}
 .dpad .l{left:0;top:30%;width:30%;height:40%}
 .dpad .r{right:0;top:30%;width:30%;height:40%}
@@ -50,9 +59,28 @@ button:active{background:var(--key-hi);transform:scale(.97)}
 .row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .row button{height:48px;font-size:14px}
 .power{color:var(--err);font-weight:700}
+.power.armed{background:var(--err);color:#fff}
 
-.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
-  background:#000c;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
+/* 아래에서 올라오는 시트: TV 선택, 허용 대기, PIN, 인증서 경고 */
+.dim{position:fixed;inset:0;background:#0009;display:none;z-index:10}
+.dim.show{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--panel);border-top:1px solid var(--line);
+  border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(105%);transition:.22s;max-height:80vh;overflow:auto}
+.sheet.show{transform:translateY(0)}
+.sheet h2{font-size:17px;margin:0 0 6px}
+.sheet p{color:var(--mut);margin:0 0 12px;font-size:14px}
+.sheet .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.list{display:flex;flex-direction:column;gap:8px}
+.list button{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;width:100%}
+.list .t{flex:1;min-width:0}
+.list .t b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .t small{color:var(--mut)}
+.list .tag{font-size:11px;color:var(--ok)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--mut);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);z-index:20;
+  background:#000d;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
 </style>
@@ -61,14 +89,21 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
 <div class="wrap">
   <header>
     <h1>TV 리모컨</h1>
-    <span id="state" class="pill">연결 안 됨</span>
+    <span id="pill" class="pill">연결 안 됨</span>
   </header>
 
   <div class="panel">
-    <p class="label">TV IP (2단계부터 연결, 3단계부터 자동 찾기)</p>
-    <div class="conn">
+    <div class="tvbar">
+      <div class="who">
+        <div class="name" id="tvName">TV 없음</div>
+        <div class="sub" id="tvSub">같은 Wi-Fi의 TV를 찾습니다</div>
+      </div>
+      <button class="btn-sm" data-act="find">TV 찾기</button>
+      <button class="btn-sm" data-act="manual">IP</button>
+    </div>
+    <div class="manual" id="manual">
       <input id="ip" placeholder="192.168.0.10" inputmode="decimal" autocomplete="off">
-      <button class="btn-acc" data-act="connect">연결</button>
+      <button class="btn-acc" data-act="connectIp">연결</button>
     </div>
   </div>
 
@@ -79,16 +114,16 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
 
   <div class="middle">
     <div class="rocker">
-      <button data-req="ssap://audio/volumeUp" aria-label="볼륨 올리기">＋</button>
+      <button data-req="ssap://audio/volumeUp" data-repeat="1" aria-label="볼륨 올리기">＋</button>
       <span>음량</span>
-      <button data-req="ssap://audio/volumeDown" aria-label="볼륨 내리기">－</button>
+      <button data-req="ssap://audio/volumeDown" data-repeat="1" aria-label="볼륨 내리기">－</button>
     </div>
     <div class="dpad">
-      <button class="u" data-btn="UP" aria-label="위">▲</button>
-      <button class="l" data-btn="LEFT" aria-label="왼쪽">◀</button>
+      <button class="u" data-btn="UP" data-repeat="1" aria-label="위">▲</button>
+      <button class="l" data-btn="LEFT" data-repeat="1" aria-label="왼쪽">◀</button>
       <button class="ok" data-btn="ENTER">확인</button>
-      <button class="r" data-btn="RIGHT" aria-label="오른쪽">▶</button>
-      <button class="d" data-btn="DOWN" aria-label="아래">▼</button>
+      <button class="r" data-btn="RIGHT" data-repeat="1" aria-label="오른쪽">▶</button>
+      <button class="d" data-btn="DOWN" data-repeat="1" aria-label="아래">▼</button>
     </div>
     <div class="rocker">
       <button data-req="ssap://media.controls/play" aria-label="재생">▶</button>
@@ -101,11 +136,14 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     <button data-btn="BACK">뒤로</button>
     <button data-btn="HOME">홈</button>
     <button data-act="mute">음소거</button>
-    <button class="power" data-req="ssap://system/turnOff">전원</button>
+    <button class="power" id="power" data-act="power">전원</button>
   </div>
 
   <footer id="ver"></footer>
 </div>
+
+<div class="dim" id="dim"></div>
+<div class="sheet" id="sheet"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -122,9 +160,21 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   ];
 
   var $ = function (id) { return document.getElementById(id); };
-  var hasBridge = typeof window.AndroidBridge !== "undefined";
-  var toastTimer = null;
+  var B = window.AndroidBridge || null;
 
+  // 화면 상태
+  var S = {
+    conn: "idle",        // idle | connecting | prompt | pin | connected | failed | closed
+    tv: null,            // {id, ip, name}
+    phase: "",           // 자동 흐름: "last"(마지막 TV 시도) → "discover"(검색) → ""
+    searching: false,
+    found: [],           // 이번 검색에서 찾은 TV
+    sheet: ""            // 열린 시트 종류
+  };
+  var seq = 0, pending = {};
+
+  // ------------------------------------------------------------ 공통 UI
+  var toastTimer = null;
   function toast(msg) {
     var t = $("toast");
     t.textContent = msg;
@@ -132,43 +182,318 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
   }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function tvLabel(t) { return (t && (t.name || "").replace(/^\[LG\]\s*/, "")) || "LG TV"; }
 
-  function renderApps() {
-    $("apps").innerHTML = FAVORITES.map(function (a) {
-      return '<button class="app" data-launch="' + a.id + '">' + a.title + "</button>";
-    }).join("");
+  function render() {
+    var pill = $("pill"), c = S.conn;
+    var map = {
+      idle: ["연결 안 됨", ""], closed: ["연결 끊김", ""], failed: ["연결 실패", "bad"],
+      connecting: ["연결 중…", "wait"], prompt: ["TV에서 허용 대기", "wait"], pin: ["PIN 입력 대기", "wait"],
+      connected: ["연결됨", "on"]
+    };
+    var m = map[c] || map.idle;
+    if (S.searching && c !== "connected") m = ["TV 찾는 중…", "wait"];
+    pill.textContent = m[0];
+    pill.className = "pill " + m[1];
+    $("tvName").textContent = S.tv ? tvLabel(S.tv) : "TV 없음";
+    $("tvSub").textContent = S.tv ? (S.tv.ip || "") : (S.searching ? "같은 Wi-Fi에서 찾는 중…" : "TV 찾기를 누르세요");
   }
 
-  // 1단계: 아직 TV 통신 없음 — 무엇이 보내질지 표시만 한다
-  function notYet(what) { toast("2단계에서 연결됩니다 · " + what); }
+  // ------------------------------------------------------------ 시트
+  function openSheet(kind, html) {
+    S.sheet = kind;
+    $("sheet").innerHTML = html;
+    $("sheet").classList.add("show");
+    $("dim").classList.add("show");
+  }
+  function closeSheet() {
+    S.sheet = "";
+    $("sheet").classList.remove("show");
+    $("dim").classList.remove("show");
+  }
+  function showPicker() {
+    var saved = [];
+    try { saved = JSON.parse(B.savedTvs()); } catch (e) {}
+    var byId = {};
+    S.found.forEach(function (t) { byId[t.id] = t; });
+    saved.forEach(function (t) { if (!byId[t.id]) byId[t.id] = t; });
+    var items = Object.keys(byId).map(function (k) { return byId[k]; });
+    var html = "<h2>TV 선택</h2>";
+    html += S.searching ? '<p><span class="spin"></span>같은 Wi-Fi에서 찾는 중…</p>' : "<p>연결할 TV를 고르세요.</p>";
+    html += '<div class="list">' + (items.length ? items.map(function (t) {
+      var foundNow = S.found.some(function (f) { return f.id === t.id; });
+      return '<button data-pick="' + esc(t.id) + '"><span class="t"><b>' + esc(tvLabel(t)) + "</b><small>" +
+        esc(t.ip) + (t.model ? " · " + esc(t.model) : "") + (foundNow ? "" : " · 저장됨") + "</small></span>" +
+        (t.known ? '<span class="tag">연결한 적 있음</span>' : "") + "</button>";
+    }).join("") : (S.searching ? "" : "<p>찾은 TV가 없습니다. TV가 켜져 있는지, 같은 Wi-Fi인지 확인하거나 IP로 연결하세요.</p>")) + "</div>";
+    html += '<div class="acts"><button class="btn-sm" data-act="manualFromSheet">IP 직접 입력</button>' +
+      '<button class="btn-sm" data-act="find">다시 찾기</button><button class="btn-sm" data-act="close">닫기</button></div>';
+    openSheet("picker", html);
+  }
+  function showPrompt() {
+    openSheet("prompt", "<h2>TV 화면에서 '허용'을 눌러 주세요</h2><p>" + esc(tvLabel(S.tv)) +
+      "에 연결 요청을 보냈습니다. 처음 한 번만 하면 됩니다.</p>" +
+      '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
+  }
+  function showPin(msg) {
+    openSheet("pin", "<h2>PIN 입력</h2><p>" + esc(msg || "TV 화면에 표시된 숫자를 입력하세요.") + "</p>" +
+      '<div style="display:flex;gap:8px"><input id="pin" inputmode="numeric" maxlength="8">' +
+      '<button class="btn-acc" data-act="sendPin">확인</button></div>' +
+      '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
+    setTimeout(function () { var p = $("pin"); if (p) p.focus(); }, 50);
+  }
+  function showCertChanged() {
+    openSheet("cert", "<h2>TV 인증서가 바뀌었습니다</h2><p>" + esc(tvLabel(S.tv) + " (" + (S.tv ? S.tv.ip : "") + ")") +
+      "의 보안 인증서가 지난번과 다릅니다. TV를 초기화했거나 업데이트했다면 정상입니다. 같은 TV가 맞을 때만 계속하세요.</p>" +
+      '<div class="acts"><button class="btn-sm" data-act="close">취소</button>' +
+      '<button class="btn-acc btn-sm" data-act="acceptCert">같은 TV 맞음 · 다시 연결</button></div>');
+  }
 
+  // ------------------------------------------------------------ 연결 흐름
+  function connectTv(tv) {
+    S.tv = { id: tv.id, ip: tv.ip, name: tv.name || "" };
+    S.conn = "connecting";
+    render();
+    B.connect(tv.id);
+  }
+  function startDiscover(showSheet) {
+    if (S.searching) { if (showSheet) showPicker(); return; }
+    S.searching = true;
+    S.found = [];
+    render();
+    if (showSheet) showPicker();
+    B.discover();
+  }
+
+  function onState(d) {
+    var prev = S.conn;
+    S.conn = d.state;
+    if (d.id) S.tv = { id: d.id, ip: d.ip, name: d.name || (S.tv && S.tv.name) || "" };
+    render();
+    switch (d.state) {
+      case "connected":
+        S.phase = "";
+        if (S.sheet && S.sheet !== "picker") closeSheet();
+        if (S.sheet === "picker") closeSheet();
+        if (prev !== "connected") toast(tvLabel(S.tv) + " 연결됨");
+        break;
+      case "prompt":
+        showPrompt();
+        break;
+      case "pin":
+        showPin(d.message);
+        break;
+      case "failed":
+        if (d.code === "cert_changed") { S.phase = ""; showCertChanged(); break; }
+        if (S.sheet === "prompt" || S.sheet === "pin") closeSheet();
+        if (S.phase === "last") {           // 마지막 TV 실패 → 자동 검색
+          S.phase = "discover";
+          startDiscover(false);
+        } else {
+          toast("연결 실패: " + (d.message || ""));
+        }
+        break;
+      case "closed":
+        if (S.sheet === "prompt" || S.sheet === "pin") closeSheet();
+        break;
+    }
+  }
+
+  function onFound(t) {
+    if (!S.found.some(function (f) { return f.id === t.id; })) S.found.push(t);
+    if (S.sheet === "picker") showPicker();
+  }
+
+  function onDiscoverDone(d) {
+    S.searching = false;
+    render();
+    if (S.conn === "connected" || S.conn === "connecting" || S.conn === "prompt" || S.conn === "pin") {
+      if (S.sheet === "picker") showPicker();
+      return;
+    }
+    if (d.error) toast("검색 오류: " + d.error);
+    var auto = S.phase === "discover";
+    S.phase = "";
+    if (S.found.length === 1 && (auto || S.sheet !== "picker")) {
+      closeSheet();
+      connectTv(S.found[0]);
+    } else {
+      showPicker();
+    }
+  }
+
+  // Kotlin → JS 이벤트 (ARCHITECTURE.md 3절)
+  window.onBridge = function (type, dataJson) {
+    var d = {};
+    try { d = JSON.parse(dataJson); } catch (e) {}
+    if (type === "state") onState(d);
+    else if (type === "tvFound") onFound(d);
+    else if (type === "discoverDone") onDiscoverDone(d);
+    else if (type === "response") {
+      var p = pending[d.reqId];
+      if (p) { delete pending[d.reqId]; clearTimeout(p.timer); p.cb(d); }
+    } else if (type === "error") toast(d.message || "오류");
+  };
+
+  // ------------------------------------------------------------ 명령
+  function connectedOrWarn() {
+    if (S.conn === "connected") return true;
+    toast(S.conn === "prompt" ? "TV에서 '허용'을 먼저 눌러 주세요" : "TV에 연결되지 않았습니다");
+    return false;
+  }
+  function call(uri, payload, cb) {
+    if (!connectedOrWarn()) return;
+    var id = "js_" + (++seq);
+    pending[id] = {
+      cb: function (d) {
+        if (!d.ok) toast("실패: " + (d.error || uri.replace("ssap://", "")));
+        if (cb) cb(d);
+      },
+      timer: setTimeout(function () { if (pending[id]) { delete pending[id]; toast("TV 응답 없음"); } }, 8000)
+    };
+    B.request(id, uri, payload ? JSON.stringify(payload) : "");
+  }
+  function press(name) {
+    if (!connectedOrWarn()) return;
+    if (!B.button(name)) toast("버튼 전송 실패");
+  }
+  function toggleMute() {
+    call("ssap://audio/getVolume", null, function (d) {
+      if (!d.ok) return;
+      var p = d.payload || {}, vs = p.volumeStatus || {};
+      var muted = vs.muteStatus != null ? vs.muteStatus : (p.muted != null ? p.muted : !!p.mute);
+      call("ssap://audio/setMute", { mute: !muted }, function (r) { if (r.ok) toast(muted ? "음소거 해제" : "음소거"); });
+    });
+  }
+  var powerTimer = null;
+  function power() {
+    var b = $("power");
+    if (!b.classList.contains("armed")) {
+      if (!connectedOrWarn()) return;
+      b.classList.add("armed");
+      b.textContent = "끄기?";
+      toast("한 번 더 누르면 TV가 꺼집니다");
+      powerTimer = setTimeout(disarm, 2500);
+      return;
+    }
+    disarm();
+    call("ssap://system/turnOff", null, function (d) { if (d.ok) toast("TV를 껐습니다"); });
+  }
+  function disarm() {
+    clearTimeout(powerTimer);
+    var b = $("power");
+    b.classList.remove("armed");
+    b.textContent = "전원";
+  }
+
+  function act(b) {
+    if (b.dataset.pick) {
+      var id = b.dataset.pick;
+      var t = S.found.filter(function (f) { return f.id === id; })[0];
+      if (!t) { try { t = JSON.parse(B.savedTvs()).filter(function (f) { return f.id === id; })[0]; } catch (e) {} }
+      closeSheet();
+      if (t) connectTv(t);
+      return;
+    }
+    if (b.dataset.launch) return call("ssap://system.launcher/launch", { id: b.dataset.launch });
+    if (b.dataset.req) return call(b.dataset.req, null);
+    if (b.dataset.btn) return press(b.dataset.btn);
+    switch (b.dataset.act) {
+      case "find": startDiscover(true); break;
+      case "manual": $("manual").classList.toggle("open"); if ($("manual").classList.contains("open")) $("ip").focus(); break;
+      case "manualFromSheet": closeSheet(); $("manual").classList.add("open"); $("ip").focus(); break;
+      case "connectIp":
+        var ip = $("ip").value.trim();
+        if (!ip) { toast("IP를 입력하세요"); break; }
+        S.tv = { id: "", ip: ip, name: "" };
+        S.conn = "connecting"; S.phase = "";
+        render();
+        $("manual").classList.remove("open");
+        B.connectIp(ip);
+        break;
+      case "close": closeSheet(); break;
+      case "cancel": closeSheet(); B.disconnect(); break;
+      case "sendPin": var pin = $("pin"); if (pin && pin.value.trim()) B.sendPin(pin.value.trim()); break;
+      case "acceptCert": closeSheet(); if (S.tv) { B.acceptCert(S.tv.id); connectTv(S.tv); } break;
+      case "mute": toggleMute(); break;
+      case "power": power(); break;
+    }
+  }
+
+  // 탭 + 길게 누르면 반복 (볼륨, 방향키)
+  var rep = null;
+  function stopRepeat() { if (rep) { clearTimeout(rep.t); clearInterval(rep.i); rep = null; } }
   document.addEventListener("click", function (ev) {
     var b = ev.target.closest("button");
+    if (!b || b.disabled) return;
+    if (b.dataset.repeat && rep && rep.fired) return;   // 반복으로 이미 보냄
+    act(b);
+  });
+  document.addEventListener("pointerdown", function (ev) {
+    var b = ev.target.closest("button[data-repeat]");
     if (!b) return;
-    if (b.dataset.launch) return notYet("launch " + b.dataset.launch);
-    if (b.dataset.req) return notYet(b.dataset.req.replace("ssap://", ""));
-    if (b.dataset.btn) return notYet("button " + b.dataset.btn);
-    if (b.dataset.act === "connect") return notYet("connect " + ($("ip").value.trim() || "(IP 없음)"));
-    if (b.dataset.act === "mute") return notYet("audio/setMute");
+    stopRepeat();
+    rep = { fired: false };
+    rep.t = setTimeout(function () {
+      rep.fired = true;
+      act(b);
+      rep.i = setInterval(function () { act(b); }, 180);
+    }, 450);
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (n) {
+    document.addEventListener(n, function () { setTimeout(stopRepeat, 0); }, true);
+  });
+  $("dim").addEventListener("click", function () { if (S.sheet !== "prompt") closeSheet(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    if (e.target.id === "ip") act({ dataset: { act: "connectIp" } });
+    if (e.target.id === "pin") act({ dataset: { act: "sendPin" } });
   });
 
-  // Kotlin → JS 이벤트 (ARCHITECTURE.md 3절). 1단계에서는 받기만 한다.
-  window.onBridge = function (type, dataJson) {
-    try { console.log("bridge", type, JSON.parse(dataJson)); } catch (e) {}
+  // 안드로이드 뒤로 키: 시트가 열려 있으면 닫기
+  window.onBackKey = function () {
+    if (S.sheet) { closeSheet(); return true; }
+    if ($("manual").classList.contains("open")) { $("manual").classList.remove("open"); return true; }
+    return false;
   };
-  // 안드로이드 뒤로 키: 처리했으면 true
-  window.onBackKey = function () { return false; };
 
-  try { var last = localStorage.getItem("last_ip"); if (last) $("ip").value = last; } catch (e) {}
-  $("ip").addEventListener("change", function () {
-    try { localStorage.setItem("last_ip", $("ip").value.trim()); } catch (e) {}
+  // 앱으로 돌아왔을 때 끊겨 있으면 다시 연결
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !B) return;
+    if ((S.conn === "closed" || S.conn === "failed") && S.tv && S.tv.id && !S.sheet) connectTv(S.tv);
   });
 
-  var ver = "브라우저 미리보기";
-  if (hasBridge) { try { ver = "v" + JSON.parse(window.AndroidBridge.appInfo()).version; } catch (e) {} }
-  $("ver").textContent = ver + " · 1단계 화면 골격";
+  // ------------------------------------------------------------ 시작
+  $("apps").innerHTML = FAVORITES.map(function (a) {
+    return '<button class="app" data-launch="' + esc(a.id) + '">' + esc(a.title) + "</button>";
+  }).join("");
 
-  renderApps();
+  if (!B) {
+    $("ver").textContent = "브라우저 미리보기 · 앱에서만 TV에 연결됩니다";
+    render();
+    return;
+  }
+  try { $("ver").textContent = "v" + JSON.parse(B.appInfo()).version; } catch (e) {}
+
+  var lastId = "";
+  try { lastId = B.lastTv(); } catch (e) {}
+  var lastTv = null;
+  if (lastId) {
+    try { lastTv = JSON.parse(B.savedTvs()).filter(function (t) { return t.id === lastId; })[0]; } catch (e) {}
+  }
+  if (lastTv) {                 // 1) 마지막 TV로 바로 연결
+    S.phase = "last";
+    connectTv(lastTv);
+  } else {                      // 2) 처음이면 검색
+    S.phase = "discover";
+    startDiscover(false);
+  }
+  render();
 })();
 </script>
 </body>

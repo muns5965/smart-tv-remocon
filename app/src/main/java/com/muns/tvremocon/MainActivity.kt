@@ -63,6 +63,17 @@ class MainActivity : Activity() {
         }
     }
 
+    // 화면의 visibilitychange(돌아오면 재연결)가 동작하도록 WebView에 전달
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+    }
+
+    override fun onPause() {
+        webView.onPause()
+        super.onPause()
+    }
+
     override fun onDestroy() {
         bridge.release()
         webView.destroy()

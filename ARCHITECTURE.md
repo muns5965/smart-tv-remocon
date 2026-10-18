@@ -32,41 +32,64 @@
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 1 | 문서, `tools/lg_tv_apps.py`, 빈 앱(WebView + 화면 골격), Actions 빌드 | 진행 |
-| 2 | `WebOsClient` + 브리지: IP 입력 → 인증 → 앱 실행·볼륨·전원·방향키 | 예정 |
-| 3 | `TvDiscovery`: TV 자동 찾기 | 예정 |
-| 이후 | 다른 제조사(삼성 등)는 `TvClient` 인터페이스로 확장 | 미정 |
+| 1 | 문서, `tools/lg_tv_apps.py`, 빈 앱(WebView + 화면 골격), Actions 빌드 | 완료 |
+| 2 | `WebOsClient` + 브리지: 인증 → 앱 실행·볼륨·음소거·재생·전원·방향키 | 진행 (실TV 확인 대기) |
+| 3 | `TvDiscovery`(SSDP): TV 자동 찾기 — 실TV 응답 확인 후 2단계에 합침 | 진행 (실TV 확인 대기) |
+| 이후 | 앱 전체 목록, 문자 입력, 외부입력, 전원 켜기(WoL), 다른 제조사 | 미정 |
 
-## 3. 브리지 API (2단계에서 구현, 이름은 이 문서 기준으로 고정)
+### 파일
+
+| 파일 | 역할 | 안드로이드 의존 |
+|---|---|---|
+| `WebOsClient.kt` | wss 접속, 인증서 지문(TOFU), register, ssap 요청, 포인터 소켓 | 없음 (단위 테스트) |
+| `SsdpSearch.kt` | SSDP 검색·응답 파싱·기기 설명 XML | 없음 (단위 테스트) |
+| `TvDiscovery.kt` | SsdpSearch + 백그라운드 스레드 + MulticastLock | 있음 |
+| `TvStore.kt` | TV별 키·인증서·이름 저장 (SharedPreferences) | 있음 |
+| `AndroidBridge.kt` | JS ↔ Kotlin, 위 클래스 연결 | 있음 |
+| `assets/index.html` | 화면, 자동 연결 흐름 | — |
+
+### 자동 연결 흐름 (index.html)
+1. 마지막 TV(`lastTv()`)가 있으면 바로 `connect(id)`
+2. 실패하면 자동으로 `discover()` → 1대면 바로 연결, 여러 대면 선택 시트, 0대면 선택 시트(IP 직접 입력 안내)
+3. 처음 실행이면 2번부터
+4. 앱으로 돌아왔을 때 끊겨 있으면 다시 연결
+
+## 3. 브리지 API (구현 기준)
 
 ### JS → Kotlin (`window.AndroidBridge`)
-모든 메서드는 즉시 반환하고, 결과는 이벤트로 돌려준다. 인자와 결과는 JSON 문자열.
+결과는 대부분 이벤트로 돌려준다. 인자·결과는 문자열(JSON).
 
-| 메서드 | 인자 | 결과 이벤트 |
+| 메서드 | 인자 | 반환/결과 이벤트 |
 |---|---|---|
-| `appInfo()` | 없음 | 동기 반환: `{"version":"0.1.0","build":N}` |
+| `appInfo()` | 없음 | 동기: `{"version","build","stage"}` |
+| `savedTvs()` | 없음 | 동기: `[{"id","ip","name","model","known"}]` (키·인증서 값은 내보내지 않음) |
+| `lastTv()` | 없음 | 동기: 마지막 TV id 또는 `""` |
 | `discover()` | 없음 | `tvFound` (여러 번), `discoverDone` |
-| `connect(ip)` | TV IP | `state` |
-| `disconnect()` | 없음 | `state` |
+| `connect(id)` | 저장된 TV id | `state` |
+| `connectIp(ip)` | IP 직접 입력 | `state` |
+| `disconnect()` | 없음 | `state: closed` |
 | `request(reqId, uri, payloadJson)` | ssap 요청 | `response` |
-| `button(name)` | `UP`, `ENTER` 등 | 없음 (실패 시 `error`) |
-| `forget(ip)` | TV IP | 저장된 키 삭제 |
+| `button(name)` | `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` … | 동기: 전송/대기열 성공 여부 |
+| `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
+| `acceptCert(id)` | 인증서 바뀐 TV를 같은 TV로 인정 | 저장된 지문 삭제 |
+| `forget(id)` | TV 삭제 | — |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
 
 | type | data |
 |---|---|
-| `state` | `{"state":"connecting"|"prompt"|"pin"|"connected"|"closed"|"failed","ip":"...","message":"..."}` |
-| `response` | `{"reqId":"...","ok":true,"payload":{...}}` / `{"reqId":"...","ok":false,"error":"..."}` |
-| `tvFound` | `{"ip":"...","name":"...","model":"..."}` |
-| `discoverDone` | `{"count":N}` |
-| `error` | `{"message":"..."}` |
+| `state` | `{"state":"connecting"\|"prompt"\|"pin"\|"connected"\|"closed"\|"failed","id","ip","name","message","code"}` — `code:"cert_changed"`이면 인증서 경고 |
+| `response` | `{"reqId","ok":true,"payload":{...}}` / `{"reqId","ok":false,"error":"..."}` |
+| `tvFound` | `{"id","ip","name","model","uuid","known"}` |
+| `discoverDone` | `{"count", "error"?}` |
+| `error` | `{"message"}` |
 
 ## 4. 저장 데이터 (SharedPreferences, 앱 내부)
-- `tv_keys`: `{ip → client-key}`
-- `tv_cert`: `{ip → TV 인증서 SHA-256}` (처음 접속 때 저장, 이후 다르면 경고 = TOFU 고정)
-- `last_ip`: 마지막 TV
-- 화면 설정(즐겨찾기 앱 순서 등)은 WebView `localStorage`
+- `tv_store/tvs`: `{id → {ip, name, model, uuid, key, cert}}`
+  - id는 SSDP로 찾으면 `uuid:<값>`(IP가 바뀌어도 유지), 수동 입력이면 `ip:<IP>` → 나중에 SSDP로 찾으면 uuid 항목으로 키를 옮김
+  - `cert`: 처음 접속 때 TV 인증서 SHA-256 저장, 이후 다르면 접속 중단 후 사용자 확인 (TOFU)
+- `tv_store/last`: 마지막으로 연결된 TV id
+- 화면 설정(이후 즐겨찾기 순서 등)은 WebView `localStorage`
 
 ## 5. 빌드와 서명
 - 로컬 Android 환경 없이 **GitHub Actions**(`.github/workflows/build.yml`)로 빌드한다.
