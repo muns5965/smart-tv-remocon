@@ -109,10 +109,26 @@ name:UP
 
 앱 ID는 TV·지역·펌웨어마다 다를 수 있다. **앱에서는 고정값 대신 `listLaunchPoints` 결과를 기준**으로 하고, 위 표는 즐겨찾기 기본값으로만 쓴다.
 
-## 6. TV 찾기 (SSDP) — 3단계에서 구현 예정
+## 6. TV 찾기 (SSDP) — 실TV 확인 (2026-10-19, `tools/ssdp_find_tv.py`)
 
-- `M-SEARCH * HTTP/1.1` 을 `239.255.255.250:1900`로 멀티캐스트
+- `M-SEARCH * HTTP/1.1` 을 `239.255.255.250:1900`로 멀티캐스트 (MX: 2, 3번 반복 전송)
 - `ST: urn:lge-com:service:webos-second-screen:1`
-- 응답 헤더의 `LOCATION` 호스트 = TV IP
-- Android는 `WifiManager.MulticastLock` 과 `CHANGE_WIFI_MULTICAST_STATE` 권한 필요
-- (공개 앱 코드에서 확인, 실TV 미확인)
+- TV는 요청 보낸 포트로 **유니캐스트 응답** → 응답의 송신 주소 = TV IP
+- 실제 응답 (OLED42C3KNA):
+```
+ST: urn:lge-com:service:webos-second-screen:1
+LOCATION: http://192.168.8.219:1474/
+SERVER: WebOS/4.1.0 UPnP/1.0
+USN: uuid:<기기 고유값>::urn:lge-com:service:webos-second-screen:1
+```
+- `LOCATION`의 XML에서 `friendlyName` = `[LG] webOS TV OLED42C3KNA`, `modelNumber` = `OLED42C3KNA`
+- LOCATION 포트(1474)는 TV마다 다를 수 있으므로 고정값으로 쓰지 않는다.
+- `USN`의 uuid는 TV 고유값 → IP가 바뀌어도 같은 TV인지 구별하는 키로 쓸 수 있다.
+
+### 주의: 폰과 TV의 IP 대역이 다를 수 있음
+- 확인 당시 폰 IP는 `10.0.0.50`, TV는 `192.168.8.219` (대역이 다른데도 SSDP·wss 모두 동작)
+- 따라서 "폰 IP 기준 같은 /24 대역 훑기"는 TV를 못 찾을 수 있다. 보조 수단은 **마지막 IP 기억 + 직접 입력**을 우선한다.
+
+### Android 구현 메모 (공개 앱 코드 기준, 앱에서 재확인 필요)
+- 응답이 유니캐스트라 `MulticastLock` 없이도 받을 가능성이 높지만, 기기별 차이를 막기 위해 검색 동안만 잡는다.
+- `CHANGE_WIFI_MULTICAST_STATE` 권한은 매니페스트에 이미 있음.
