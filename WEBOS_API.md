@@ -95,7 +95,9 @@ name:UP
 ```
 - 실TV ✅ (2026-10-19, 앱): `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` 동작 확인
 - 버튼 이름: `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` `EXIT` `MENU` `INFO` `LIST` `0`~`9` `DASH` `RED` `GREEN` `YELLOW` `BLUE` (공개 앱 코드)
-- 클릭: `type:click\n\n`, 스크롤: `type:scroll\ndx:0\ndy:<n>\n\n`
+- 클릭: `type:click\n\n`, 스크롤: `type:scroll\ndx:0\ndy:<n>\n\n` (공개 앱 코드, 실TV 확인 중)
+- 커서 이동: `type:move\ndx:<n>\ndy:<n>\ndown:0\n\n` — 실TV ✅ (2026-10-19, `tools/lg_pointer_test.py`: 10씩 15번 → 네모 그림)
+- 실TV의 `socketPath` 형식: `wss://<TV_IP>:3001/resources/<고유값>/netinput.pointer.sock` (같은 3001 포트, 별도 경로)
 
 ## 5. 앱 ID (2026-10-19 실TV `listLaunchPoints` 결과)
 
