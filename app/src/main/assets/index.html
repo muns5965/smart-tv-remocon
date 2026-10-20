@@ -668,13 +668,20 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       pad.classList.remove("active");
       // 탭 = 클릭: 단독 click은 TV가 무시 → 살짝 이동 후 30ms 뒤 클릭
       if (g && g.maxN === 1 && g.dist < 10 && e.timeStamp - g.t0 < 300 && e.type === "pointerup") {
-        sendMove(1, 0);
-        setTimeout(function () { B.pointerClick(); }, 30);
+        if (!B.pointerTap() && !warned) { warned = true; toast("TV에 연결되지 않았습니다"); }
       }
       g = null;
     }
     pad.addEventListener("pointerup", end);
     pad.addEventListener("pointercancel", end);
+    // 앱이 백그라운드로 가면 손가락 상태·누적값·타이머를 정리 (pointerup이 오지 않는 경우 대비)
+    function resetPad() {
+      ptrs = {}; n = 0; g = null; acc.x = acc.y = 0; scrollAcc = 0;
+      clearInterval(timer); timer = null;
+      pad.classList.remove("active");
+    }
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState !== "visible") resetPad(); });
+    window.addEventListener("blur", resetPad);
   })();
 
   // ------------------------------------------------------------ 시작

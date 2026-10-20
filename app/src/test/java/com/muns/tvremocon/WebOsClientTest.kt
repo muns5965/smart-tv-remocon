@@ -3,7 +3,9 @@ package com.muns.tvremocon
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
@@ -17,6 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 가짜 LG TV(MockWebServer, TLS 자체 서명)로 WebOsClient 시나리오 확인.
@@ -31,6 +34,9 @@ class WebOsClientTest {
     private val tvReceived = LinkedBlockingQueue<String>()
     @Volatile private var pointerFails = false
     @Volatile private var pointerPath: String? = null     // null이면 정상 주소
+    @Volatile private var ptrDelayMs = 0L                  // 포인터 주소 응답 지연 (대기열 시험)
+    @Volatile private var dupPointer = false               // 포인터 주소 응답을 두 번 (중복 응답 시험)
+    private val pointerConnections = AtomicInteger(0)
 
     private val listener = object : WebOsClient.Listener {
         override fun onState(tag: String, state: String, message: String) { events.add("state:$tag:$state:$message") }
@@ -78,10 +84,13 @@ class WebOsClientTest {
                             webSocket.send("""{"type":"error","id":"$id","error":"500 Application error","payload":{}}""")
                         }
                     }
-                    "ssap://com.webos.service.networkinput/getPointerInputSocket" -> webSocket.send(
-                        if (pointerFails) """{"type":"error","id":"$id","error":"500 no pointer"}"""
+                    "ssap://com.webos.service.networkinput/getPointerInputSocket" -> {
+                        val reply = if (pointerFails) """{"type":"error","id":"$id","error":"500 no pointer"}"""
                         else """{"type":"response","id":"$id","payload":{"returnValue":true,"socketPath":"${pointerPath ?: "wss://${server.hostName}:${server.port}/pointer"}"}}"""
-                    )
+                        val times = if (dupPointer) 2 else 1
+                        if (ptrDelayMs > 0) Thread { Thread.sleep(ptrDelayMs); repeat(times) { webSocket.send(reply) } }.start()
+                        else repeat(times) { webSocket.send(reply) }
+                    }
                     "ssap://bad/uri" -> webSocket.send("""{"type":"error","id":"$id","error":"404 no such service"}""")
                     else -> webSocket.send("""{"type":"response","id":"$id","payload":{"returnValue":true}}""")
                 }
@@ -90,8 +99,11 @@ class WebOsClientTest {
     }
 
     private val pointerTv = object : WebSocketListener() {
-        override fun onMessage(webSocket: WebSocket, text: String) { pointerTexts.add(text) }
-        override fun onOpen(webSocket: WebSocket, response: Response) {}
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            pointerTexts.add(text)
+            if (text.contains("name:CLOSEME")) webSocket.close(1000, "tv closed pointer")   // TV가 포인터를 닫는 상황
+        }
+        override fun onOpen(webSocket: WebSocket, response: Response) { pointerConnections.incrementAndGet() }
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             webSocket.close(1000, null)
         }
@@ -105,10 +117,12 @@ class WebOsClientTest {
         val certs = HandshakeCertificates.Builder().heldCertificate(held).build()
         server = MockWebServer()
         server.useHttps(certs.sslSocketFactory(), false)
-        server.enqueue(MockResponse().withWebSocketUpgrade(tv))
-        server.enqueue(MockResponse().withWebSocketUpgrade(pointerTv))
-        server.enqueue(MockResponse().withWebSocketUpgrade(tv))
-        server.enqueue(MockResponse().withWebSocketUpgrade(pointerTv))
+        // 경로로 구분: /pointer → 포인터 소켓, 그 외 → 본 소켓 (연결 순서와 무관하게 응답)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (request.path?.startsWith("/pointer") == true) MockResponse().withWebSocketUpgrade(pointerTv)
+                else MockResponse().withWebSocketUpgrade(tv)
+        }
         server.start()
     }
 
@@ -204,6 +218,7 @@ class WebOsClientTest {
         val c = client()
         c.connect("tvA", server.hostName, "good-key", null)
         await("state:tvA:connected")
+        awaitPointer(c)                          // 이동·스크롤은 대기하지 않으므로 포인터가 열린 뒤에
         assertTrue(c.pointerMove(12, -7))
         assertTrue(c.pointerClick())
         assertTrue(c.pointerScroll(10))
@@ -288,6 +303,120 @@ class WebOsClientTest {
             "wss", "192.168.8.219", 3001))
         assertFalse(WebOsClient.isSameTarget("wss://192.168.8.219/x", "wss", "192.168.8.219", 3001))
         assertFalse(WebOsClient.isSameTarget("not a url", "wss", "192.168.8.219", 3001))
+    }
+
+    private fun awaitPointer(c: WebOsClient, ready: Boolean = true) {
+        val end = System.currentTimeMillis() + 5000
+        while (c.isPointerReady() != ready) {
+            if (System.currentTimeMillis() > end) throw AssertionError("포인터 상태가 $ready 가 되지 않음")
+            Thread.sleep(20)
+        }
+    }
+
+    private fun drainPointer(ms: Long): List<String> {
+        val out = ArrayList<String>()
+        while (true) out.add(pointerTexts.poll(ms, TimeUnit.MILLISECONDS) ?: break)
+        return out
+    }
+
+    // ---- 전체 소스 점검(5차) 반영: 경쟁 상태
+
+    @Test
+    fun buttonQueue_full_returnsFalse_andKeepsOrder() {
+        ptrDelayMs = 700                                     // 포인터가 늦게 열리는 동안 버튼이 쌓임
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        val names = listOf("UP", "DOWN", "LEFT", "RIGHT", "ENTER")
+        names.forEach { assertTrue(it, c.button(it)) }
+        assertFalse("6번째는 대기열이 차서 false", c.button("BACK"))
+        assertFalse("이동은 대기하지 않음", c.pointerMove(5, 5))
+        val got = (1..5).map { pointerTexts.poll(5, TimeUnit.SECONDS) }
+        assertEquals(names.map { "type:button\nname:$it\n\n" }, got)
+        assertNull(pointerTexts.poll(300, TimeUnit.MILLISECONDS))
+        c.disconnect()
+    }
+
+    @Test
+    fun duplicatePointerAddress_opensOneSocket() {
+        dupPointer = true
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        awaitPointer(c)
+        Thread.sleep(500)
+        assertEquals(1, pointerConnections.get())
+        c.disconnect()
+    }
+
+    @Test
+    fun pointerClosedByTv_reopens_andKeepsOrder() {
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        awaitPointer(c)
+        assertTrue(c.button("CLOSEME"))
+        assertEquals("type:button\nname:CLOSEME\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        awaitPointer(c, ready = false)                       // TV가 닫음 → IDLE
+        assertTrue(c.button("UP"))
+        assertTrue(c.button("DOWN"))
+        assertEquals("type:button\nname:UP\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        assertEquals("type:button\nname:DOWN\n\n", pointerTexts.poll(5, TimeUnit.SECONDS))
+        assertEquals(2, pointerConnections.get())
+        c.disconnect()
+    }
+
+    @Test
+    fun rapidSwitch_A_B_A_noMixing() {
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        c.connect("tvB", server.hostName, "good-key", null)
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        c.request("js_ab", "ssap://audio/volumeUp", null)
+        assertEquals("response:tvA:js_ab:true:", await("response:"))
+        Thread.sleep(500)
+        val rest = ArrayList<String>()
+        events.drainTo(rest)
+        assertTrue("B의 연결·등록 이벤트가 섞이면 안 됨: $rest",
+            rest.none { it.startsWith("state:tvB:connected") || it.startsWith("registered:tvB") })
+        c.disconnect()
+    }
+
+    @Test
+    fun tap_sendsMoveThenClick() {
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        awaitPointer(c)
+        assertTrue(c.pointerTap())
+        assertEquals(listOf("type:move\ndx:1\ndy:0\ndown:0\n\n", "type:click\n\n"), drainPointer(400))
+        c.disconnect()
+    }
+
+    @Test
+    fun tap_thenSwitchTv_clickIsNotSent() {
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        awaitPointer(c)
+        assertTrue(c.pointerTap())
+        c.connect("tvB", server.hostName, "good-key", null)   // 30ms 안에 전환
+        val got = drainPointer(500)
+        assertTrue("전환 뒤 클릭이 가면 안 됨: $got", got.none { it.startsWith("type:click") })
+        c.disconnect()
+    }
+
+    @Test
+    fun repeatedConnect_doesNotGrowThreads() {
+        val c = WebOsClient(listener, port = 1, scheme = "wss")    // 닫힌 포트 → 즉시 실패
+        repeat(5) { c.connect("w$it", "127.0.0.1", null, null); c.disconnect() }
+        Thread.sleep(500)
+        val before = Thread.activeCount()
+        repeat(50) { c.connect("t$it", "127.0.0.1", null, null); c.disconnect() }
+        Thread.sleep(1000)
+        val after = Thread.activeCount()
+        assertTrue("스레드 $before → $after", after - before < 10)
     }
 
     @Test

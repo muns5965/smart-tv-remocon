@@ -106,6 +106,10 @@ class AndroidBridge(
     @JavascriptInterface
     fun pointerClick(): Boolean = client.pointerClick()
 
+    /** 탭 = 이동 → 30ms → 클릭을 같은 세션에서 (TV가 바뀌면 클릭 안 함) */
+    @JavascriptInterface
+    fun pointerTap(): Boolean = client.pointerTap()
+
     @JavascriptInterface
     fun pointerScroll(dy: Int): Boolean = client.pointerScroll(dy)
 

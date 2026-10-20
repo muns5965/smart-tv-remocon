@@ -149,8 +149,10 @@ class SsdpSearch(private val st: String = ST_LG) {
          */
         fun fetchDescription(location: String, fromIp: String, timeoutMs: Long = DESC_TIMEOUT_MS): Pair<String, String>? {
             val (addr, port, path) = checkLocation(location, fromIp) ?: return null
-            val deadline = System.currentTimeMillis() + timeoutMs
-            fun remaining(): Int = (deadline - System.currentTimeMillis()).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            // 단조 시계(nanoTime) 기준 — 시스템 시각이 바뀌어도 마감이 흔들리지 않음
+            val deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
+            fun remaining(): Int = TimeUnit.NANOSECONDS.toMillis(deadlineNs - System.nanoTime())
+                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             val s = Socket()
             val closeAtDeadline = Runnable { try { s.close() } catch (e: Exception) { } }   // Runnable 명시: Callable과 겹침 방지
             val watchdog = DESC_TIMER.schedule(closeAtDeadline, timeoutMs, TimeUnit.MILLISECONDS)

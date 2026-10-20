@@ -79,10 +79,11 @@
 | `connectIp(ip)` | IP 직접 입력 (IPv4·IPv6 표기만, 호스트 이름 불가) | `state` |
 | `disconnect()` | 없음 | `state: closed` |
 | `request(reqId, uri, payloadJson)` | ssap 요청 | `response` |
-| `button(name)` | `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` … | 동기: 전송/대기열 성공 여부 |
-| `pointerMove(dx, dy)` | 터치패드 커서 이동 (TV 단위, 화면 가로 ≈ 600~650) | 동기: 성공 여부 |
-| `pointerClick()` | 클릭. **단독으로는 TV가 무시** → 화면이 `pointerMove(1,0)` 후 30ms 뒤 호출 | 동기 |
-| `pointerScroll(dy)` | 스크롤. 10 단위, 양수 = 위 | 동기 |
+| `button(name)` | `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` … 포인터가 열리기 전이면 **FIFO 대기(최대 5, 차면 false)** | 동기: 전송/대기 성공 여부 |
+| `pointerMove(dx, dy)` | 터치패드 커서 이동 (TV 단위, 화면 가로 ≈ 600~650). **대기하지 않음** — 포인터가 안 열렸으면 false | 동기 |
+| `pointerTap()` | 탭 = 클릭. Kotlin이 **같은 세션·같은 포인터 연결**에서 이동(1,0) → 30ms → 클릭. 그 사이 TV가 바뀌면 클릭 안 함 | 동기 |
+| `pointerClick()` | 단독 클릭 (TV가 무시하므로 보통 `pointerTap` 사용) | 동기 |
+| `pointerScroll(dy)` | 스크롤. 10 단위, 양수 = 위. 대기하지 않음 | 동기 |
 | `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
 | `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
@@ -112,10 +113,17 @@
 - **SSDP 응답**: 첫 줄 `HTTP/1.x 200`, `ST` 정확히 일치, uuid는 `[0-9A-Za-z-]{1,64}` — 어긋나면 uuid 없이 `ip:` 새 기기로 취급(기존 TV의 키와 묶지 않음, `TvMerge`). LOCATION 256자 초과는 버리고 TV는 유지.
 - **IP 직접 입력**은 사용자가 TV를 지목한 것이므로 같은 IP의 기존 항목을 쓴다 (상대가 바뀌었으면 지문 고정이 막음).
 
+### 포인터 소켓 상태 (전체 소스 점검 반영)
+- `IDLE → REQUESTING(주소 요청) → CONNECTING(소켓 여는 중) → OPEN`. IDLE일 때만 주소를 요청하고, REQUESTING일 때만 주소 응답을 처리 → 중복 응답에도 소켓 1개.
+- 포인터 연결마다 번호(`ptrGen`)를 붙이고, 열림·종료 콜백은 자기 번호가 현재일 때만 상태를 바꿈 → 이전 소켓의 늦은 종료가 새 연결을 지우지 않음.
+- TV가 포인터를 닫으면 IDLE로 돌아가고, 다음 버튼·이동 때 다시 요청.
+- `request()`는 세션 확인과 전송을 한 번의 잠금 안에서 처리.
+- OkHttp: 공유 기본 클라이언트 1개에서 세션마다 `newBuilder()`로 인증서 검사만 바꿔 파생 (디스패처·스레드·연결 풀 공유). 50회 반복 연결 시 스레드가 늘지 않는 것을 테스트로 확인.
+
 ### 기기 설명(LOCATION) 조회
 - 안드로이드는 HTTP(cleartext)를 기본 차단한다. 앱 전체 정책은 차단 그대로 두고, 설명 XML만 **소켓으로 직접 GET**.
 - 조건: `http`만, 호스트는 IP 표기이고 **SSDP 응답을 보낸 IP와 같을 때만**, 헤더 8KB·본문 64KB, 리디렉션 따르지 않음. 실패해도 TV는 이름 없이 목록에 남는다.
-- 시간: 연결·헤더·본문을 합쳐 **전체 2초**. 하나의 마감 시각으로 대기 시간을 남은 시간만큼만 주고, 공유 스케줄러(데몬 1개)에 "마감 시 소켓 닫기"를 예약해 절대 마감을 보장. 예약은 `finally`에서 취소.
+- 시간: 연결·헤더·본문을 합쳐 **전체 2초** (단조 시계 `nanoTime` 기준). 하나의 마감 시각으로 대기 시간을 남은 시간만큼만 주고, 공유 스케줄러(데몬 1개)에 "마감 시 소켓 닫기"를 예약해 절대 마감을 보장. 예약은 `finally`에서 취소.
 - 검색은 3초 동안 응답만 모으고, 설명 XML은 그 뒤에 TV별로 받는다.
 
 ## 4. 저장 데이터 (SharedPreferences, 앱 내부)
