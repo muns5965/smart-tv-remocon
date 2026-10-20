@@ -89,6 +89,7 @@
 | `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
 | `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
+| `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (안드로이드 화면 전송 설정 → 삼성 Smart View → 디스플레이 설정 순) | `cast {via}` |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
 
@@ -99,6 +100,12 @@
 | `tvFound` | `{"id","ip","name","model","uuid","known"}` |
 | `discoverDone` | `{"count", "error"?}` |
 | `error` | `{"message"}` — 방향키 소켓 실패도 여기로 |
+| `cast` | `{"via":"cast_settings"\|"smart_view"\|"display_settings"\|"none"}` — 어떤 화면이 열렸는지 |
+
+### 화면 미러링 · Miracast · DeX (검토 결론)
+- 일반 앱은 Miracast(Wi-Fi Display) 연결이나 DeX(안드로이드 16+ 데스크톱 모드 기반) 진입을 **시작할 수 없다** — 시스템 권한·시스템 UI 영역. Knox `DexManager`는 기업용 라이선스 필요라 해당 없음.
+- 앱은 시스템 화면 전송 화면을 열어 주고, 사용자가 TV(LG 화면 공유 = Miracast 수신)를 고른다. 삼성 폰은 연결 후 DeX 선택 가능(기기·버전별 실기 확인 필요).
+- 앱이 직접 하는 미러링(LG Cast/Connect SDK, TV 브라우저 스트리밍)은 별도 검토 대상 — 미구현.
 
 ### 연결 세션과 저장 (검토 반영)
 - `WebOsClient`의 모든 콜백은 `connect()`에 준 **tag(=TV id)**를 돌려준다. 브리지는 키·지문 저장에 이 tag만 쓴다.

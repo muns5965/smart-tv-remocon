@@ -1,6 +1,9 @@
 package com.muns.tvremocon
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import org.json.JSONObject
@@ -128,10 +131,40 @@ class AndroidBridge(
         store.setKey(id, null)
     }
 
+    /**
+     * 화면 미러링 / DeX: 일반 앱은 Miracast·DeX를 직접 시작할 수 없으므로 시스템 화면 전송 화면을 연다.
+     * 순서: 안드로이드 화면 전송 설정 → 삼성 Smart View 앱 → 디스플레이 설정.
+     * 결과는 이벤트 cast {via}: cast_settings | smart_view | display_settings | none (실기 확인용으로 화면에 표시)
+     */
+    @JavascriptInterface
+    fun openCastSettings() {
+        activity.runOnUiThread {
+            val via = tryStart(Intent(Settings.ACTION_CAST_SETTINGS), "cast_settings")
+                ?: activity.packageManager.getLaunchIntentForPackage(SMART_VIEW_PKG)
+                    ?.let { tryStart(it, "smart_view") }
+                ?: tryStart(Intent(Settings.ACTION_DISPLAY_SETTINGS), "display_settings")
+                ?: "none"
+            emit("cast", JSONObject().put("via", via))
+        }
+    }
+
+    private fun tryStart(intent: Intent, name: String): String? = try {
+        activity.startActivity(intent)
+        name
+    } catch (e: ActivityNotFoundException) {
+        null
+    } catch (e: SecurityException) {
+        null
+    }
+
     @JavascriptInterface
     fun forget(id: String) {
         if (id == currentId) client.disconnect()
         store.forget(id)
+    }
+
+    companion object {
+        const val SMART_VIEW_PKG = "com.samsung.android.smartmirroring"
     }
 
     // ------------------------------------------------------------ WebOsClient.Listener

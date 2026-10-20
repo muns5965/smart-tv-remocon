@@ -269,6 +269,10 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       '<button class="btn-sm" data-act="find" style="flex:none">TV 찾기</button>' +
       '<input id="ip" placeholder="IP 직접 입력 (예: 192.168.0.10)" inputmode="decimal" autocomplete="off">' +
       '<button class="btn-acc btn-sm" data-act="connectIp">연결</button></div>';
+    html += '<p class="sect">폰 화면을 TV로 (미러링 · DeX)</p>' +
+      '<button class="btn-sm" data-act="cast" style="width:100%;padding:11px">화면 미러링 열기</button>' +
+      '<p class="hint" style="font-size:12px;color:var(--mut);margin:6px 2px 0">폰의 화면 전송(삼성: Smart View)이 열립니다. 이 TV를 고르면 미러링되고, ' +
+      '삼성 폰은 연결 후 DeX를 선택할 수 있습니다. TV 조작은 이 앱에서 그대로 됩니다.</p>';
     html += '<p class="sect">터치패드 커서 속도</p><div class="speed"><span>느림</span>' +
       '<input type="range" id="speed" min="0.6" max="3" step="0.1" value="' + speed + '"><span>빠름</span>' +
       '<b id="speedv" style="width:34px;text-align:right">' + speed.toFixed(1) + "</b></div>";
@@ -414,6 +418,11 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       var p = pending[d.reqId];
       if (p) { delete pending[d.reqId]; clearTimeout(p.timer); p.cb(d); }
     } else if (type === "error") toast(d.message || "오류");
+    else if (type === "cast") {                      // 어떤 화면이 열렸는지 표시 (실기 확인용)
+      var names = { cast_settings: "안드로이드 화면 전송 설정", smart_view: "Smart View", display_settings: "디스플레이 설정" };
+      castMsg = d.via === "none" ? "화면 전송 화면을 열 수 없습니다" : "열림: " + (names[d.via] || d.via);
+      toast(castMsg);                                 // 설정 화면으로 넘어가 못 볼 수 있어 돌아왔을 때 한 번 더
+    }
   };
 
   // ------------------------------------------------------------ 명령
@@ -532,6 +541,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       case "usePrompt": closeSheet(); if (S.tv && S.tv.id) { S.conn = "connecting"; render(); B.connectPrompt(S.tv.id); } break;
       case "acceptCert": closeSheet(); if (S.tv) { B.acceptCert(S.tv.id); connectTv(S.tv); } break;
       case "mute": toggleMute(); break;
+      case "cast": if (B.openCastSettings) B.openCastSettings(); else toast("앱에서만 동작합니다"); break;
       case "power": power(); break;
     }
   }
@@ -589,9 +599,11 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     return false;
   };
 
+  var castMsg = "";
   // 앱으로 돌아왔을 때 끊겨 있으면 다시 연결
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState !== "visible" || !B) return;
+    if (castMsg) { var m = castMsg; castMsg = ""; setTimeout(function () { toast(m); }, 300); }
     if ((S.conn === "closed" || S.conn === "failed") && S.tv && S.tv.id && !S.sheet) connectTv(S.tv);
   });
 

@@ -7,6 +7,11 @@
     <!-- 3단계 TV 자동 찾기(SSDP 멀티캐스트) -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- 화면 미러링 버튼: 삼성 Smart View 앱이 있는지 확인 (Android 11+ 패키지 가시성) -->
+    <queries>
+        <package android:name="com.samsung.android.smartmirroring" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
