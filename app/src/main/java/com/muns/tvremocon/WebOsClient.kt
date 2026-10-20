@@ -360,15 +360,18 @@ class WebOsClient(
         val client = s.http ?: return
         client.newWebSocket(Request.Builder().url(socketPath).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                val queued: List<String>
                 synchronized(lock) {
                     if (cur !== s || s.ptrGen != myPtr || s.ptr != Ptr.CONNECTING) { webSocket.cancel(); return }
                     s.pointer = webSocket
                     // 대기한 버튼을 OPEN 전환과 같은 잠금 안에서 먼저 전송 큐에 넣는다
                     // → 다른 스레드의 새 버튼이 대기 버튼을 앞지르지 못함 (OkHttp send는 비차단 큐잉)
-                    s.pendingButtons.forEach { webSocket.send(it) }
+                    queued = ArrayList(s.pendingButtons)
                     s.pendingButtons.clear()
                     s.ptr = Ptr.OPEN
                 }
+                Thread.sleep(5)   // [실험] 수정 전 코드: 잠금 밖에서 전송 (경쟁 창을 조금 넓힘)
+                queued.forEach { webSocket.send(it) }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
