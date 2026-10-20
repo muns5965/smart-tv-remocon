@@ -49,7 +49,7 @@
 - TV 응답: `{"type":"response","id":"register_0","payload":{"pairingType":"PIN","returnValue":true}}`
 - 앱이 `{"id":"pin_0","type":"request","uri":"ssap://pairing/setPin","payload":{"pin":"<숫자>"}}` 전송
 - 맞으면 곧바로 `{"type":"registered","id":"register_0","payload":{"client-key":"..."}}`
-- 확인 당시 PIN은 **8자리**. 다른 모델은 길이가 다를 수 있으므로 앱은 길이 제한을 두지 않는다
+- 확인 당시 PIN은 **8자리**. 다른 모델은 길이가 다를 수 있어, 앱의 화면 숫자판은 **최대 16자리**까지 받는다
 - 틀린 PIN 응답 형식은 실TV 미확인 (앱은 `type:error` 또는 `returnValue:false`를 둘 다 "틀림"으로 처리)
 - **앱의 새 등록 기본값은 PIN**, PIN이 안 뜨는 TV는 PROMPT로 전환
 - 저장된 키가 거부되면 `type: "error"` → 키를 지우고 다시 register
@@ -126,7 +126,7 @@ name:UP
 | 현재 방송 | `com.webos.app.livetv` |
 | HDMI 입력 n | `com.webos.app.hdmi<n>` (입력 이름을 바꿔도 ID는 그대로) |
 
-앱 ID는 TV·지역·펌웨어마다 다를 수 있다. **앱에서는 고정값 대신 `listLaunchPoints` 결과를 기준**으로 하고, 위 표는 즐겨찾기 기본값으로만 쓴다.
+앱 ID는 TV·지역·펌웨어마다 다를 수 있다. **현재 앱의 바로 실행 버튼은 위 표에서 실TV로 확인한 ID를 고정값(`index.html`의 `FAVORITES`)으로 쓴다.** `listLaunchPoints`로 설치된 앱을 조회해 매핑하는 기능은 후속 개선 사항이다.
 
 ## 6. TV 찾기 (SSDP) — 실TV 확인 (2026-10-19, `tools/ssdp_find_tv.py`)
 

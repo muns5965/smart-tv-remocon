@@ -36,6 +36,7 @@ class WebOsClientTest {
     @Volatile private var pointerPath: String? = null     // null이면 정상 주소
     @Volatile private var ptrDelayMs = 0L                  // 포인터 주소 응답 지연 (대기열 시험)
     @Volatile private var dupPointer = false               // 포인터 주소 응답을 두 번 (중복 응답 시험)
+    @Volatile private var staleFirst = false               // 이전 요청 ID의 응답을 먼저, 진짜 응답은 300ms 뒤
     private val pointerConnections = AtomicInteger(0)
 
     private val listener = object : WebOsClient.Listener {
@@ -88,7 +89,10 @@ class WebOsClientTest {
                         val reply = if (pointerFails) """{"type":"error","id":"$id","error":"500 no pointer"}"""
                         else """{"type":"response","id":"$id","payload":{"returnValue":true,"socketPath":"${pointerPath ?: "wss://${server.hostName}:${server.port}/pointer"}"}}"""
                         val times = if (dupPointer) 2 else 1
-                        if (ptrDelayMs > 0) Thread { Thread.sleep(ptrDelayMs); repeat(times) { webSocket.send(reply) } }.start()
+                        if (staleFirst) {
+                            webSocket.send("""{"type":"response","id":"ptr_0","payload":{"returnValue":true,"socketPath":"wss://${server.hostName}:${server.port}/pointer"}}""")
+                            Thread { Thread.sleep(300); webSocket.send(reply) }.start()
+                        } else if (ptrDelayMs > 0) Thread { Thread.sleep(ptrDelayMs); repeat(times) { webSocket.send(reply) } }.start()
                         else repeat(times) { webSocket.send(reply) }
                     }
                     "ssap://bad/uri" -> webSocket.send("""{"type":"error","id":"$id","error":"404 no such service"}""")
@@ -404,6 +408,41 @@ class WebOsClientTest {
         c.connect("tvB", server.hostName, "good-key", null)   // 30ms 안에 전환
         val got = drainPointer(500)
         assertTrue("전환 뒤 클릭이 가면 안 됨: $got", got.none { it.startsWith("type:click") })
+        c.disconnect()
+    }
+
+    /** 6차 점검 3-2: 대기열을 비우는 순간 다른 스레드의 새 버튼이 앞지르면 안 됨 */
+    @Test
+    fun flushRace_queuedButtonsGoFirst() {
+        ptrDelayMs = 300
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        val queued = (1..5).map { "Q$it" }
+        queued.forEach { assertTrue(c.button(it)) }
+        val presser = Thread {                                 // 포인터가 열리는 순간을 노려 계속 누름
+            val end = System.currentTimeMillis() + 1500
+            while (System.currentTimeMillis() < end) { c.button("NEW"); Thread.sleep(1) }
+        }
+        presser.start()
+        presser.join()
+        val first5 = (1..5).map { pointerTexts.poll(5, TimeUnit.SECONDS) }
+        assertEquals(queued.map { "type:button\nname:$it\n\n" }, first5)
+        c.disconnect()
+    }
+
+    /** 6차 점검 3-1: 이전 요청 ID(ptr_0)의 응답은 무시하고 지금 요청 ID 응답으로만 연결 */
+    @Test
+    fun staleOldPointerResponse_isIgnored() {
+        staleFirst = true
+        val c = client()
+        c.connect("tvA", server.hostName, "good-key", null)
+        await("state:tvA:connected")
+        Thread.sleep(150)
+        assertEquals("오래된 응답으로 연결하면 안 됨", 0, pointerConnections.get())
+        awaitPointer(c)                                        // 300ms 뒤 진짜 응답으로 연결
+        Thread.sleep(200)
+        assertEquals(1, pointerConnections.get())
         c.disconnect()
     }
 

@@ -60,6 +60,8 @@ class WebOsClient(
         // 포인터
         var ptr = Ptr.IDLE
         var ptrGen = 0                      // 포인터 연결 번호 (늦은 콜백 무시용)
+        var ptrReqSeq = 0                   // 포인터 주소 요청 번호 → 요청 ID "ptr_<n>"
+        var ptrReqId: String? = null        // 지금 기다리는 주소 요청 ID (이것과 같은 응답만 처리)
         var pointer: WebSocket? = null
         var pointerBlocked = false          // TV가 준 포인터 주소가 이상하면 이 세션에서는 다시 요청하지 않음
         val pendingButtons = ArrayList<String>()   // 순서가 중요한 버튼만 FIFO로 대기
@@ -229,6 +231,7 @@ class WebOsClient(
     /** lock 안에서 호출: 포인터를 IDLE로 되돌리고 이전 포인터 연결의 콜백은 무효화 */
     private fun resetPointerLocked(s: Session) {
         s.ptrGen++
+        s.ptrReqId = null
         s.pointer?.cancel()
         s.pointer = null
         s.ptr = Ptr.IDLE
@@ -260,10 +263,10 @@ class WebOsClient(
         val type = m.optString("type")
         val payload = m.optJSONObject("payload")
 
-        when (id) {
-            REGISTER_ID -> handleRegister(s, sock, type, payload, m.optString("error"))
-            POINTER_ID -> handlePointerAddress(s, type, payload?.optString("socketPath").orEmpty())
-            PIN_ID -> {
+        when {
+            id == REGISTER_ID -> handleRegister(s, sock, type, payload, m.optString("error"))
+            id.startsWith(POINTER_PREFIX) -> handlePointerAddress(s, id, type, payload?.optString("socketPath").orEmpty())
+            id == PIN_ID -> {
                 if (type == "error" || payload?.optBoolean("returnValue", true) == false) {
                     listener.onState(s.tag, "pin", "PIN이 맞지 않습니다")
                 }
@@ -276,12 +279,16 @@ class WebOsClient(
         }
     }
 
-    /** 포인터 주소 응답. REQUESTING일 때만 처리 (중복 응답은 무시 → 소켓 1개만) */
-    private fun handlePointerAddress(s: Session, type: String, path: String) {
+    /**
+     * 포인터 주소 응답. REQUESTING이고 **지금 기다리는 요청 ID와 같을 때만** 처리
+     * → 중복 응답·이전 요청의 늦은 응답은 무시 (소켓 1개만)
+     */
+    private fun handlePointerAddress(s: Session, respId: String, type: String, path: String) {
         var error: String? = null
         var openGen: Int? = null
         synchronized(lock) {
-            if (s.ptr != Ptr.REQUESTING) return
+            if (s.ptr != Ptr.REQUESTING || respId != s.ptrReqId) return
+            s.ptrReqId = null
             when {
                 type != "error" && path.isNotEmpty() && isSamePointerTarget(path, s.host) -> {
                     s.ptrGen++
@@ -340,8 +347,11 @@ class WebOsClient(
         if (s.pointerBlocked || s.ptr != Ptr.IDLE) return
         val sock = s.ws ?: return
         s.ptr = Ptr.REQUESTING
+        s.ptrReqSeq++
+        val reqId = POINTER_PREFIX + s.ptrReqSeq
+        s.ptrReqId = reqId
         sock.send(
-            JSONObject().put("id", POINTER_ID).put("type", "request")
+            JSONObject().put("id", reqId).put("type", "request")
                 .put("uri", "ssap://com.webos.service.networkinput/getPointerInputSocket").toString()
         )
     }
@@ -350,15 +360,15 @@ class WebOsClient(
         val client = s.http ?: return
         client.newWebSocket(Request.Builder().url(socketPath).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                val queued: List<String>
                 synchronized(lock) {
                     if (cur !== s || s.ptrGen != myPtr || s.ptr != Ptr.CONNECTING) { webSocket.cancel(); return }
                     s.pointer = webSocket
-                    s.ptr = Ptr.OPEN
-                    queued = ArrayList(s.pendingButtons)
+                    // 대기한 버튼을 OPEN 전환과 같은 잠금 안에서 먼저 전송 큐에 넣는다
+                    // → 다른 스레드의 새 버튼이 대기 버튼을 앞지르지 못함 (OkHttp send는 비차단 큐잉)
+                    s.pendingButtons.forEach { webSocket.send(it) }
                     s.pendingButtons.clear()
+                    s.ptr = Ptr.OPEN
                 }
-                queued.forEach { webSocket.send(it) }      // 대기한 버튼을 순서대로
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -379,7 +389,7 @@ class WebOsClient(
     private fun dropPointer(s: Session, myPtr: Int, error: String?) {
         val hadPending: Boolean
         synchronized(lock) {
-            if (s.ptrGen != myPtr) return
+            if (cur !== s || s.ptrGen != myPtr) return      // 현재 세션의 현재 포인터 연결일 때만
             hadPending = s.pendingButtons.isNotEmpty()
             s.pointer = null
             s.ptr = Ptr.IDLE                         // 다음 버튼 때 다시 요청
@@ -445,7 +455,7 @@ class WebOsClient(
         }
 
         const val REGISTER_ID = "register_0"
-        const val POINTER_ID = "ptr_0"
+        const val POINTER_PREFIX = "ptr_"           // 포인터 주소 요청 ID: ptr_1, ptr_2, …
         const val PIN_ID = "pin_0"
         const val PAIRING_PIN = "PIN"
         const val PAIRING_PROMPT = "PROMPT"
