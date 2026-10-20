@@ -7,10 +7,16 @@ IR(적외선)이 아니라 TV가 열어 둔 **네트워크 제어 API**(`wss://T
 > **터치패드 모드**에서 폰 화면을 드래그하면 LG 매직 리모컨처럼 TV의 커서가 이동하고,
 > **탭하면 클릭**, **두 손가락으로 위아래로 밀면 스크롤**됩니다. 방향키로 한 칸씩 옮길 필요가 없습니다.
 
-| 터치패드 모드 | 방향키 모드 | ⚙ 설정 | 첫 연결 (PIN) |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/images/remote_touchpad.png" width="200" alt="터치패드 모드: 드래그로 TV 커서 이동"> | <img src="docs/images/remote_dpad.png" width="200" alt="방향키 모드"> | <img src="docs/images/settings.png" width="200" alt="설정 시트"> | <img src="docs/images/pin.png" width="200" alt="PIN 입력"> |
-| **드래그 = 커서 이동**<br>탭 = 클릭<br>두 손가락 = 스크롤 | 방향키·확인<br>길게 누르면 반복 | 저장된 TV·TV 찾기<br>IP 입력·커서 속도 | TV 화면의 숫자를<br>숫자판으로 입력 (리모컨 불필요) |
+<table>
+<tr>
+<td align="center" width="50%"><b>터치패드 모드</b><br><img src="docs/images/remote_touchpad.png" width="100%" alt="터치패드 모드: 드래그로 TV 커서 이동"><br><b>드래그 = 커서 이동</b><br>탭 = 클릭 · 두 손가락 = 스크롤</td>
+<td align="center" width="50%"><b>방향키 모드</b><br><img src="docs/images/remote_dpad.png" width="100%" alt="방향키 모드"><br>방향키·확인<br>길게 누르면 반복</td>
+</tr>
+<tr>
+<td align="center" width="50%"><b>⚙ 설정</b><br><img src="docs/images/settings.png" width="100%" alt="설정 시트"><br>저장된 TV · TV 찾기<br>IP 입력 · 커서 속도</td>
+<td align="center" width="50%"><b>첫 연결 (PIN)</b><br><img src="docs/images/pin.png" width="100%" alt="PIN 숫자판 입력"><br>TV 화면의 숫자를 숫자판으로<br>(리모컨 불필요)</td>
+</tr>
+</table>
 
 <sub>이미지는 앱의 실제 화면 파일(`app/src/main/assets/index.html`)을 예시 TV 데이터로 렌더링한 것. 터치패드 그림의 분홍 화살표는 손가락 드래그를 표시하기 위해 덧그린 것이다.</sub>
 
