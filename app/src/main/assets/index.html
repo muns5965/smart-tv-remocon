@@ -52,6 +52,14 @@ body.mode-pad .dpad{display:none}
 .tvrow .danger{color:var(--err)}
 .tvrow .danger.armed{background:var(--err);color:#fff}
 .sect{font-size:12px;color:var(--mut);margin:14px 0 8px 2px}
+/* PIN 숫자판 (시스템 키보드 대신) */
+.pinbox{font:600 26px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:6px;text-align:center;padding:12px;
+  background:var(--bg);border:1px solid var(--line);border-radius:12px;min-height:56px;margin:4px 0 12px;word-break:break-all}
+.pinbox.empty{font:15px/1.9 inherit;letter-spacing:0;color:var(--mut)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keypad button{height:52px;font-size:22px;font-weight:600}
+.keypad .ok{background:var(--acc);color:#fff;font-size:16px}
+.keypad .ok:active{background:#e23d6b}
 .speed{display:flex;align-items:center;gap:10px}
 .speed input{flex:1;padding:0}
 input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px;font:inherit;user-select:text;-webkit-user-select:text}
@@ -275,15 +283,33 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
   }
   // 처음 등록: TV 화면에 뜬 숫자를 입력 (리모컨 불필요). 길이 제한 없음, 숫자만
+  // 숫자판으로 입력 (시스템 키보드를 띄우지 않음)
+  var pinVal = "";
   function showPin(msg) {
     var wrong = msg && msg.indexOf("맞지 않") >= 0;
+    pinVal = "";
+    var keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(function (k) {
+      return '<button data-key="' + k + '">' + k + "</button>";
+    }).join("") + '<button data-key="back" aria-label="지우기">⌫</button><button data-key="0">0</button>' +
+      '<button class="ok" id="pinOk" data-act="sendPin">확인</button>';
     openSheet("pin", "<h2>TV 화면의 숫자 입력</h2><p>" +
-      esc(wrong ? msg + " 다시 입력하세요." : tvLabel(S.tv) + " 화면에 표시된 숫자를 입력하세요. 처음 한 번만 하면 됩니다.") + "</p>" +
-      '<div style="display:flex;gap:8px"><input id="pin" inputmode="numeric" pattern="[0-9]*" autocomplete="off">' +
-      '<button class="btn-acc" data-act="sendPin">확인</button></div>' +
+      esc(wrong ? msg.replace(/[.\s]*$/, "") + ". 다시 입력하세요." : tvLabel(S.tv) + " 화면에 표시된 숫자를 입력하세요. 처음 한 번만 하면 됩니다.") + "</p>" +
+      '<div class="pinbox" id="pinbox" aria-live="polite"></div><div class="keypad">' + keys + "</div>" +
       '<div class="acts"><button class="btn-sm" data-act="usePrompt">숫자가 안 뜨면: TV에서 허용</button>' +
       '<button class="btn-sm" data-act="cancel">취소</button></div>');
-    setTimeout(function () { var p = $("pin"); if (p) p.focus(); }, 50);
+    renderPin();
+  }
+  function renderPin() {
+    var box = $("pinbox"), ok = $("pinOk");
+    if (!box) return;
+    box.textContent = pinVal || "숫자 버튼을 누르세요";
+    box.classList.toggle("empty", !pinVal);
+    if (ok) ok.disabled = !pinVal;
+  }
+  function pinKey(k) {
+    if (k === "back") pinVal = pinVal.slice(0, -1);
+    else if (/^[0-9]$/.test(k) && pinVal.length < 16) pinVal += k;
+    renderPin();
   }
   // 인증서가 바뀜: 기존 키는 보내지 않고, 다시 등록하면 진짜 TV 화면에만 숫자가 뜬다
   function showCertChanged(d) {
@@ -471,6 +497,10 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       showSettings();
       return;
     }
+    if (b.dataset.key) {
+      if (pinCleared) { pinCleared = false; return; }   // 길게 눌러 전부 지운 직후의 클릭은 무시
+      return pinKey(b.dataset.key);
+    }
     if (b.dataset.mode) return setMode(b.dataset.mode);
     if (b.dataset.launch) return call("ssap://system.launcher/launch", { id: b.dataset.launch });
     if (b.dataset.req) return call(b.dataset.req, null);
@@ -496,9 +526,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       case "close": closeSheet(); break;
       case "cancel": closeSheet(); B.disconnect(); break;
       case "sendPin":
-        var pin = $("pin"), v = pin ? pin.value.replace(/\D/g, "") : "";
-        if (!v) { toast("TV 화면의 숫자를 입력하세요"); break; }
-        B.sendPin(v);
+        if (!pinVal) { toast("TV 화면의 숫자를 입력하세요"); break; }
+        B.sendPin(pinVal);
         break;
       case "usePrompt": closeSheet(); if (S.tv && S.tv.id) { S.conn = "connecting"; render(); B.connectPrompt(S.tv.id); } break;
       case "acceptCert": closeSheet(); if (S.tv) { B.acceptCert(S.tv.id); connectTv(S.tv); } break;
@@ -534,7 +563,24 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Enter") return;
     if (e.target.id === "ip") act({ dataset: { act: "connectIp" } });
-    if (e.target.id === "pin") act({ dataset: { act: "sendPin" } });
+    if (S.sheet === "pin") act({ dataset: { act: "sendPin" } });
+  });
+
+  // ⌫ 길게 누르면 전부 지우기
+  var pinCleared = false, pinHold = null;
+  document.addEventListener("pointerdown", function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-key="back"]');
+    if (!b) return;
+    pinHold = setTimeout(function () { pinVal = ""; pinCleared = true; renderPin(); }, 500);
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (n) {
+    document.addEventListener(n, function () { clearTimeout(pinHold); }, true);
+  });
+  // 실물 키보드가 있으면 숫자·지우기도 받음
+  document.addEventListener("keydown", function (e) {
+    if (S.sheet !== "pin") return;
+    if (/^[0-9]$/.test(e.key)) pinKey(e.key);
+    else if (e.key === "Backspace") pinKey("back");
   });
 
   // 안드로이드 뒤로 키: 시트가 열려 있으면 닫기
