@@ -2,11 +2,15 @@ package com.muns.tvremocon
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.util.Base64
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -145,16 +149,66 @@ class AndroidBridge(
     }
 
     /**
+     * TV 아이콘 받기 (앱·외부입력). 결과는 이벤트 icon {key, ok, data(data: URI) | error, size}.
+     * 주소 검사·인증서 지문 확인은 WebOsClient.fetchResource.
+     */
+    @JavascriptInterface
+    fun fetchIcon(key: String, url: String) {
+        client.fetchResource(url, MAX_ICON_BYTES) { bytes, type, error ->
+            val d = JSONObject().put("key", key).put("url", url)
+            if (bytes != null && type != null) {
+                d.put("ok", true).put("size", bytes.size)
+                    .put("data", "data:$type;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
+            } else {
+                d.put("ok", false).put("error", error ?: "실패")
+            }
+            emit("icon", d)
+        }
+    }
+
+    /** 디버그: Smart View 앱이 다른 앱에 열어 둔 화면 목록 → [{name, exported, enabled}] + launch(실행 인텐트 유무) */
+    @JavascriptInterface
+    fun castTargets(): String {
+        val out = JSONObject()
+        val pm = activity.packageManager
+        out.put("launch", pm.getLaunchIntentForPackage(SMART_VIEW_PKG) != null)
+        val list = JSONArray()
+        try {
+            @Suppress("DEPRECATION")
+            val info = pm.getPackageInfo(SMART_VIEW_PKG, PackageManager.GET_ACTIVITIES)
+            info.activities?.forEach { a ->
+                list.put(JSONObject().put("name", a.name).put("exported", a.exported).put("enabled", a.enabled))
+            }
+            out.put("version", info.versionName ?: "")
+        } catch (e: PackageManager.NameNotFoundException) {
+            out.put("error", "Smart View 앱이 없습니다")
+        }
+        return out.put("activities", list).toString()
+    }
+
+    /** 디버그: Smart View 앱의 화면 하나를 직접 열어 보기 (이 패키지만 허용). 결과는 cast {via} */
+    @JavascriptInterface
+    fun openCastTarget(className: String) {
+        activity.runOnUiThread {
+            val intent = Intent().setComponent(ComponentName(SMART_VIEW_PKG, className))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val via = tryStart(intent, "sv:" + className.substringAfterLast('.')) ?: "none"
+            emit("cast", JSONObject().put("via", via))
+        }
+    }
+
+    /**
      * 화면 미러링 / DeX: 일반 앱은 Miracast·DeX를 직접 시작할 수 없으므로 시스템 화면 전송 화면을 연다.
-     * 순서: 안드로이드 화면 전송 설정 → 삼성 Smart View 앱 → 디스플레이 설정.
+     * 순서: 삼성 Smart View 앱 → 안드로이드 화면 전송 설정 → 디스플레이 설정.
+     * (삼성 폰에서 화면 전송 설정은 'Google Cast'로 열려 Smart View·DeX로 가지 않으므로 Smart View를 먼저 — 실기 확인)
      * 결과는 이벤트 cast {via}: cast_settings | smart_view | display_settings | none (실기 확인용으로 화면에 표시)
      */
     @JavascriptInterface
     fun openCastSettings() {
         activity.runOnUiThread {
-            val via = tryStart(Intent(Settings.ACTION_CAST_SETTINGS), "cast_settings")
-                ?: activity.packageManager.getLaunchIntentForPackage(SMART_VIEW_PKG)
+            val via = activity.packageManager.getLaunchIntentForPackage(SMART_VIEW_PKG)
                     ?.let { tryStart(it, "smart_view") }
+                ?: tryStart(Intent(Settings.ACTION_CAST_SETTINGS), "cast_settings")
                 ?: tryStart(Intent(Settings.ACTION_DISPLAY_SETTINGS), "display_settings")
                 ?: "none"
             emit("cast", JSONObject().put("via", via))
@@ -168,6 +222,8 @@ class AndroidBridge(
         null
     } catch (e: SecurityException) {
         null
+    } catch (e: IllegalArgumentException) {
+        null
     }
 
     @JavascriptInterface
@@ -178,6 +234,7 @@ class AndroidBridge(
 
     companion object {
         const val SMART_VIEW_PKG = "com.samsung.android.smartmirroring"
+        const val MAX_ICON_BYTES = 256 * 1024
     }
 
     // ------------------------------------------------------------ WebOsClient.Listener

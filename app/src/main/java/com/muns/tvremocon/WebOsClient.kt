@@ -1,5 +1,7 @@
 package com.muns.tvremocon
 
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -7,6 +9,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.URI
 import java.security.MessageDigest
 import java.security.cert.CertificateException
@@ -125,6 +128,48 @@ class WebOsClient(
                 markClosed(s)
                 if (s.certMismatch) listener.onCertMismatch(s.tag, s.seenCert)
                 else listener.onState(s.tag, "failed", t.message ?: t.javaClass.simpleName)
+            }
+        })
+    }
+
+    /**
+     * TV 리소스(앱·입력 아이콘) 받기. TV는 아이콘을 리모컨 통신과 같은 https://<TV>:3001/resources/… 로 준다 (실TV 확인).
+     * WebView는 TV 자체 서명 인증서를 믿지 않으므로 여기서 받는다.
+     * 조건: 연결된 현재 세션, [isResourceUrl] (https·같은 호스트·같은 포트·/resources/), 리디렉션 안 따름,
+     * 응답 200·image/*, 최대 [maxBytes]. 인증서는 세션 클라이언트가 저장된 지문으로 확인.
+     * @param cb (bytes, contentType, error) — OkHttp 스레드에서 호출
+     */
+    fun fetchResource(url: String, maxBytes: Int, cb: (ByteArray?, String?, String?) -> Unit) {
+        val s: Session
+        val http: OkHttpClient
+        synchronized(lock) {
+            val c = cur
+            if (c == null || !c.connected || c.http == null) { cb(null, null, "연결 안 됨"); return }
+            s = c
+            http = c.http!!
+        }
+        if (!isResourceUrl(url, s.host, port)) { cb(null, null, "허용되지 않는 주소"); return }
+        val client = http.newBuilder()
+            .followRedirects(false).followSslRedirects(false)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
+        client.newCall(Request.Builder().url(url).get().build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                cb(null, null, e.message ?: e.javaClass.simpleName)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use { r ->
+                    if (!live(s)) { cb(null, null, "TV가 바뀜"); return }
+                    if (r.code != 200) { cb(null, null, "HTTP ${r.code}"); return }
+                    val type = r.header("Content-Type").orEmpty().substringBefore(';').trim().lowercase()
+                    if (!type.startsWith("image/")) { cb(null, null, "그림이 아님: $type"); return }
+                    val body = r.body ?: run { cb(null, null, "본문 없음"); return }
+                    if (body.contentLength() > maxBytes) { cb(null, null, "너무 큼: ${body.contentLength()}"); return }
+                    val src = body.source()
+                    if (src.request(maxBytes.toLong() + 1)) { cb(null, null, "너무 큼"); return }   // 최대 크기 + 1바이트까지만 읽어 판단
+                    cb(src.buffer.readByteArray(), type, null)
+                }
             }
         })
     }
@@ -452,6 +497,22 @@ class WebOsClient(
             if (!h.equals(host.removePrefix("[").removeSuffix("]"), ignoreCase = true)) return false
             val p = if (u.port > 0) u.port else if (u.scheme.equals("wss", true)) 443 else 80
             return p == port
+        }
+
+        /**
+         * TV 리소스 주소 검사: https, 호스트·포트가 현재 TV와 같고, 경로가 /resources/ 아래이며 ".."·질의·사용자 정보가 없을 때만 true.
+         * 실TV 형식: https://<TV_IP>:3001/resources/<해시>/<파일>.png
+         */
+        fun isResourceUrl(url: String, host: String, port: Int): Boolean {
+            val u = try { URI(url.trim()) } catch (e: Exception) { return false }
+            if (!"https".equals(u.scheme, ignoreCase = true)) return false
+            if (u.rawUserInfo != null || u.rawQuery != null || u.rawFragment != null) return false
+            val h = (u.host ?: return false).removePrefix("[").removeSuffix("]")
+            if (!h.equals(host.removePrefix("[").removeSuffix("]"), ignoreCase = true)) return false
+            if (u.port != port) return false
+            val path = u.rawPath ?: return false
+            if (!path.startsWith("/resources/") || path.contains("..") || path.contains("%2e", ignoreCase = true)) return false
+            return true
         }
 
         const val REGISTER_ID = "register_0"

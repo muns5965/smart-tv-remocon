@@ -96,8 +96,11 @@
 | `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
 | `isDark()` | 없음 | 동기: 시스템 다크 모드 여부 |
+| `fetchIcon(key, url)` | TV 아이콘 주소 (`WEBOS_API.md` 리소스 조건만) | `icon {key, url, ok, data(data: URI), size \| error}` |
+| `castTargets()` | 없음 (디버그) | 동기: Smart View 앱의 화면 목록 `{launch, version, activities:[{name, exported, enabled}]}` |
+| `openCastTarget(className)` | Smart View 패키지의 화면 이름 (디버그) | `cast {via:"sv:<이름>"\|"none"}` |
 | `haptic()` | 없음 | 버튼 터치 진동 (`performHapticFeedback`, 시스템 터치 피드백 설정을 따름) |
-| `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (안드로이드 화면 전송 설정 → 삼성 Smart View → 디스플레이 설정 순) | `cast {via}` |
+| `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (삼성 Smart View → 안드로이드 화면 전송 설정 → 디스플레이 설정 순. 삼성 폰에서 화면 전송 설정은 'Google Cast'로 열림 — 실기 확인) | `cast {via}` |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
 
@@ -108,6 +111,7 @@
 | `tvFound` | `{"id","ip","name","model","uuid","known"}` |
 | `discoverDone` | `{"count", "error"?}` |
 | `error` | `{"message"}` — 방향키 소켓 실패도 여기로 |
+| `icon` | `{"key","url","ok","data","size","error"}` — `fetchIcon` 결과. 화면은 localStorage `icon:<appId>`에 `{url,data}` 저장 |
 | `theme` | `{"dark":true\|false}` — 시스템 다크 모드가 바뀜 |
 | `cast` | `{"via":"cast_settings"\|"smart_view"\|"display_settings"\|"none"}` — 어떤 화면이 열렸는지 |
 

@@ -54,6 +54,10 @@ svg{display:block;flex:none}
 .apps::-webkit-scrollbar{display:none}
 .app{width:68px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;padding:4px 0;border-radius:16px}
 .app .mono{width:46px;height:46px;border-radius:15px;background:var(--key);color:var(--mut);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700}
+.app .mono.img{background:transparent;overflow:hidden}
+.app .mono img,.inico img{width:100%;height:100%;object-fit:cover;display:block}
+.inico{width:30px;height:30px;border-radius:8px;background:#3a3a3a;overflow:hidden;flex:none;display:flex}
+.inico img{object-fit:contain}
 .app span:last-child{font-size:12px;white-space:nowrap;max-width:66px;overflow:hidden;text-overflow:ellipsis}
 
 /* 조작 카드 */
@@ -312,6 +316,47 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
   function savedTvs() { try { return JSON.parse(B.savedTvs()); } catch (e) { return []; } }
   function savedById(id) { return savedTvs().filter(function (t) { return t.id === id; })[0] || null; }
 
+  // ------------------------------------------------------------ TV 아이콘 (앱·외부입력)
+  // TV가 주는 주소는 https://<TV>:3001/resources/… (자체 서명) → Kotlin fetchIcon이 받아 data: URI로 돌려줌.
+  // localStorage "icon:<appId>" = {url, data}. 주소가 같으면 다시 받지 않음
+  var iconWant = {};
+  function iconGet(key) { try { return JSON.parse(load("icon:" + key) || "null"); } catch (e) { return null; } }
+  function needIcon(key, url, force) {
+    if (!key || !url || !B || !B.fetchIcon) return;
+    var c = iconGet(key);
+    if (!force && c && c.url === url) return;
+    if (iconWant[key] === url) return;
+    iconWant[key] = url;
+    B.fetchIcon(key, url);
+  }
+  function loadAppIcons(force) {
+    rq("ssap://com.webos.applicationManager/listLaunchPoints", null, function (d) {
+      var lp = d.ok && d.payload && d.payload.launchPoints;
+      if (!lp) { if (force) logLine("앱 목록 실패: " + (d.error || "")); return; }
+      var by = {};
+      lp.forEach(function (a) { by[a.id] = a; });
+      FAVORITES.forEach(function (f) {
+        var a = by[f.id];
+        if (a) needIcon(f.id, a.icon || a.largeIcon, force);
+        else if (force) logLine("아이콘: " + f.title + " — TV에 없는 앱");
+      });
+    }, true);
+  }
+  function onIcon(d) {
+    delete iconWant[d.key];
+    if (d.ok && d.data) store("icon:" + d.key, JSON.stringify({ url: d.url, data: d.data }));
+    if (S.page === "debug") logLine("아이콘 " + d.key + ": " + (d.ok ? "성공 " + d.size + "바이트" : "실패 " + d.error));
+    if (d.ok) { renderApps(); if (S.sheet === "inputs") renderInputs(false); }
+  }
+  function renderApps() {
+    $("apps").innerHTML = FAVORITES.map(function (a) {
+      var c = iconGet(a.id);
+      return '<button class="app" data-launch="' + esc(a.id) + '"><span class="mono' + (c ? " img" : "") + '">' +
+        (c ? '<img src="' + esc(c.data) + '" alt="">' : esc(a.title.charAt(0).toUpperCase())) +
+        "</span><span>" + esc(a.title) + "</span></button>";
+    }).join("");
+  }
+
   var STATUS = {
     idle: ["연결 안 됨", ""], closed: ["연결 끊김", ""], failed: ["연결 실패", "bad"],
     connecting: ["연결 중…", "wait"], prompt: ["TV에서 허용 대기", "wait"], pin: ["PIN 입력 대기", "wait"],
@@ -473,8 +518,9 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     rq("ssap://tv/getExternalInputList", null, function (d) {
       var devs = d.ok && d.payload && d.payload.devices;
       inputs = (devs && devs.length) ? devs.map(function (v) {
-        return { id: v.id, label: v.label || v.id, appId: v.appId || "", connected: v.connected };
+        return { id: v.id, label: v.label || v.id, appId: v.appId || "", connected: v.connected, icon: v.icon || "" };
       }) : defaultInputs();
+      inputs.forEach(function (v) { needIcon(v.appId || v.id, v.icon); });
       if (S.sheet === "inputs") renderInputs(false, !(devs && devs.length));
     }, true);
     rq("ssap://com.webos.applicationManager/getForegroundAppInfo", null, function (d) {
@@ -490,7 +536,9 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     html += '<div class="list">' + (loading ? '<div class="empty"><span class="spin"></span> 입력 목록을 받는 중…</div>' :
       all.map(function (v, i) {
         var sel = curApp && v.appId && curApp === v.appId;
-        return '<button class="item' + (sel ? " sel" : "") + '" data-input="' + i + '">' + icon(i === 0 ? "tv" : "input") +
+        var ic = i > 0 ? iconGet(v.appId || v.id) : null;
+        return '<button class="item' + (sel ? " sel" : "") + '" data-input="' + i + '">' +
+          (ic ? '<span class="inico"><img src="' + esc(ic.data) + '" alt=""></span>' : icon(i === 0 ? "tv" : "input")) +
           '<span class="t"><b>' + esc(v.label) + "</b>" + (v.connected === false ? "<small>연결된 기기 없음</small>" : "") + "</span>" +
           (sel ? '<span style="color:var(--tint-fg)">' + icon("check") + "</span>" : "") + "</button>";
       }).join("")) + "</div>";
@@ -531,6 +579,9 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     { t: "일시정지 pause", uri: "ssap://media.controls/pause" },
     { t: "앱 목록 (아이콘 주소)", uri: "ssap://com.webos.applicationManager/listLaunchPoints", sum: "launch" },
     { t: "음량 상태", uri: "ssap://audio/getVolume" },
+    { t: "아이콘 다시 받기", act: "icons" },
+    { t: "Smart View 화면 목록", act: "sv" },
+    { t: "화면 미러링 버튼 (현재 순서)", act: "cast" },
     { t: "진동 테스트", act: "haptic" },
     { t: "외부입력 패널 열기", act: "inputs" }
   ];
@@ -541,6 +592,7 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     html += '<div class="dbg">' + DEBUG_TESTS.map(function (x, i) {
       return '<button data-dbg="' + i + '">' + esc(x.t) + "</button>";
     }).join("") + "</div>";
+    html += '<div class="dbg" id="svBox" style="margin-top:8px"><div class="empty" style="grid-column:1/-1">「Smart View 화면 목록」을 누르면 여기에 열기 버튼이 생깁니다</div></div>';
     html += '<div class="sect"><span>결과</span><button class="mini" data-act="dbgCopy" style="height:36px;padding:0 12px;font-size:13px">복사</button></div>' +
       '<div class="log" id="dbgLog"></div>';
     openPage("debug", html);
@@ -564,11 +616,35 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     var s = JSON.stringify(payload);
     return s && s.length > 900 ? s.slice(0, 900) + " …(" + s.length + "자)" : s;
   }
+  // Smart View 앱이 열어 둔 화면 목록 → 화면마다 '열기' 버튼 (어느 것이 미러링 화면인지 실기로 확인)
+  function listCastTargets() {
+    if (!B || !B.castTargets) { logLine("Smart View: 브리지에 없음"); return; }
+    var r = {};
+    try { r = JSON.parse(B.castTargets()); } catch (e) {}
+    var acts = r.activities || [];
+    logLine("Smart View " + (r.version || "") + (r.error ? " " + r.error : "") + " · 실행 인텐트 " + (r.launch ? "있음" : "없음") +
+      " · 화면 " + acts.length + "개\n" + acts.map(function (a) {
+        return (a.exported ? "[공개] " : "[비공개] ") + a.name + (a.enabled ? "" : " (꺼짐)");
+      }).join("\n"));
+    var box = $("svBox");
+    if (box) box.innerHTML = acts.filter(function (a) { return a.exported; }).map(function (a) {
+      return '<button data-sv="' + esc(a.name) + '">열기: ' + esc(a.name.split(".").pop()) + "</button>";
+    }).join("") || '<div class="empty" style="grid-column:1/-1">공개된 화면이 없습니다</div>';
+  }
   function runDebug(i) {
     var x = DEBUG_TESTS[i];
     if (!x) return;
     if (x.act === "haptic") { buzz(true); logLine("진동: haptic() 호출" + (B && B.haptic ? "" : " — 브리지에 없음")); return; }
     if (x.act === "inputs") { closePage(); showInputs(); return; }
+    if (x.act === "cast") { logLine("화면 미러링 버튼 → 결과는 앱으로 돌아오면 표시"); act({ dataset: { act: "cast" } }); return; }
+    if (x.act === "sv") { listCastTargets(); return; }
+    if (x.act === "icons") {
+      if (S.conn !== "connected") { logLine("아이콘: TV에 연결되지 않음"); return; }
+      iconWant = {};
+      logLine("아이콘 다시 받기 시작 (즐겨찾기 " + FAVORITES.length + "개)");
+      loadAppIcons(true);
+      return;
+    }
     if (S.conn !== "connected") { logLine(x.t + ": TV에 연결되지 않음"); return; }
     if (x.btn) { logLine(x.t + ": button(" + x.btn + ") → " + (B.button(x.btn) ? "전송" : "전송 실패")); return; }
     logLine("→ " + x.t + "  " + x.uri + (x.p ? " " + JSON.stringify(x.p) : ""));
@@ -613,7 +689,7 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
         if (S.sheet) closeSheet();
         if (S.page === "connect") closePage();
         else if (S.page === "settings") showSettings();
-        if (prev !== "connected") toast(tvLabel(S.tv) + " 연결됨");
+        if (prev !== "connected") { toast(tvLabel(S.tv) + " 연결됨"); loadAppIcons(false); }
         break;
       case "prompt":
         showPrompt();
@@ -675,9 +751,11 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
       if (p) { delete pending[d.reqId]; clearTimeout(p.timer); p.cb(d); }
     } else if (type === "error") { toast(d.message || "오류"); if (S.page === "debug") logLine("오류 이벤트: " + (d.message || "")); }
     else if (type === "theme") window.setTheme(!!d.dark);
+    else if (type === "icon") onIcon(d);
     else if (type === "cast") {                      // 어떤 화면이 열렸는지 표시 (실기 확인용)
       var names = { cast_settings: "안드로이드 화면 전송 설정", smart_view: "Smart View", display_settings: "디스플레이 설정" };
       castMsg = d.via === "none" ? "화면 전송 화면을 열 수 없습니다" : "열림: " + (names[d.via] || d.via);
+      if (S.page === "debug") logLine("화면 전송 결과: " + d.via);
       toast(castMsg);                                 // 설정 화면으로 넘어가 못 볼 수 있어 돌아왔을 때 한 번 더
     }
   };
@@ -784,6 +862,7 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     }
     if (b.dataset.input) return pickInput(+b.dataset.input);
     if (b.dataset.dbg) return runDebug(+b.dataset.dbg);
+    if (b.dataset.sv) { logLine("열기 시도: " + b.dataset.sv); B.openCastTarget(b.dataset.sv); return; }
     if (b.dataset.mode) return setMode(b.dataset.mode);
     if (b.dataset.launch) return call("ssap://system.launcher/launch", { id: b.dataset.launch });
     if (b.dataset.req) return call(b.dataset.req, null);
@@ -985,11 +1064,8 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
   // ------------------------------------------------------------ 시작
   setMode(load("ctrl_mode") === "pad" ? "pad" : "dpad");
 
-  // 앱 아이콘: 지금은 첫 글자 (TV가 주는 아이콘은 디버그로 주소 형식을 확인한 뒤 적용)
-  $("apps").innerHTML = FAVORITES.map(function (a) {
-    return '<button class="app" data-launch="' + esc(a.id) + '"><span class="mono">' + esc(a.title.charAt(0).toUpperCase()) +
-      "</span><span>" + esc(a.title) + "</span></button>";
-  }).join("");
+  // 앱 아이콘: 저장된 TV 아이콘, 없으면 첫 글자 (연결되면 loadAppIcons가 받아 옴)
+  renderApps();
 
   var verText = "브라우저 미리보기";
   if (!B) {

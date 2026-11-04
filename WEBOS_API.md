@@ -63,11 +63,16 @@
 응답은 같은 `id`로 `{"type":"response","payload":{"returnValue":true, ...}}`.
 실패는 `type: "error"` 또는 `payload.returnValue: false`.
 
+### 리소스(아이콘) — 실TV 확인 (2026-11-04)
+- 앱·입력 아이콘 주소: `https://<TV_IP>:3001/resources/<해시>/<파일>.png` — 리모컨 통신과 **같은 호스트·포트, 같은 자체 서명 인증서**.
+- WebView는 이 인증서를 믿지 않아 직접 못 연다 → Kotlin `fetchResource`가 세션 클라이언트(지문 확인)로 받아 data: URI로 넘긴다.
+- 받는 조건: https·현재 TV 호스트·3001·`/resources/` 경로, 리디렉션 안 따름, `image/*`, 최대 256KB.
+
 ### 확인된 URI
 
 | 기능 | URI | payload | 확인 |
 |---|---|---|---|
-| 앱 목록(런처) | `ssap://com.webos.applicationManager/listLaunchPoints` | 없음 | 실TV ✅ 응답 `launchPoints[].id/title` |
+| 앱 목록(런처) | `ssap://com.webos.applicationManager/listLaunchPoints` | 없음 | 실TV ✅ 응답 `launchPoints[].id/title/icon` (아이콘 주소는 아래 '리소스') |
 | 앱 목록(전체) | `ssap://com.webos.applicationManager/listApps` | 없음 | 공개 앱 코드 |
 | 앱 실행 | `ssap://system.launcher/launch` | `{"id":"<앱ID>"}` | 실TV ✅ |
 | 볼륨 조회 | `ssap://audio/getVolume` | 없음 | 실TV ✅ (앱, 음소거 토글에 사용) |
@@ -76,8 +81,11 @@
 | 전원 끄기 | `ssap://system/turnOff` | 없음 | 실TV ✅ (앱) |
 | 전원 상태 | `ssap://com.webos.service.tvpower/power/getPowerState` | 없음 | 공개 앱 코드 |
 | 재생/일시정지 | `ssap://media.controls/play`, `.../pause` | 없음 | 실TV ✅ (앱) |
-| 외부입력 목록 | `ssap://tv/getExternalInputList` | 없음 | 공개 앱 코드 |
-| 외부입력 전환 | `ssap://tv/switchInput` | `{"inputId":"HDMI_1"}` | 공개 앱 코드 |
+| 외부입력 목록 | `ssap://tv/getExternalInputList` | 없음 | 실TV ✅ (2026-11-04, 앱) 응답 `devices[].id`(`HDMI_1`…)`/label`(TV에서 바꾼 이름)`/appId`(`com.webos.app.hdmi<n>`)`/connected/icon` |
+| 외부입력 전환 | `ssap://tv/switchInput` | `{"inputId":"HDMI_1"}` | 앱 패널로 전환 ✅ — switchInput 자체 성공인지(대체 경로: 입력 앱 실행) 디버그 확인 중 |
+| 현재 앱 | `ssap://com.webos.applicationManager/getForegroundAppInfo` | 없음 | 실TV ✅ `appId` (홈: `com.webos.app.home`, 외부입력: `com.webos.app.hdmi<n>`) |
+| 채널 업/다운 | `ssap://tv/channelUp`, `ssap://tv/channelDown` | 없음 | 공개 앱 코드 (디버그 확인 중) |
+| 되감기/빨리감기 | `ssap://media.controls/rewind`, `.../fastForward` | 없음 | 공개 앱 코드 (디버그 확인 중) |
 | 문자 입력 | `ssap://com.webos.service.ime/insertText` | `{"text":"...","replace":0}` | 공개 앱 코드 |
 | 포인터 소켓 | `ssap://com.webos.service.networkinput/getPointerInputSocket` | 없음 | 실TV ✅ (앱, 아래 4절) |
 

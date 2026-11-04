@@ -465,4 +465,37 @@ class WebOsClientTest {
         assertEquals("response::js_9:false:not_connected", await("response::js_9"))
         assertFalse(c.button("UP"))
     }
+
+    @Test
+    fun resourceUrlOnlySameTvResources() {
+        val ip = "192.168.8.219"
+        // 실TV 형식 (getExternalInputList · listLaunchPoints 응답)
+        assertTrue(WebOsClient.isResourceUrl(
+            "https://192.168.8.219:3001/resources/c8829a1bde71fac0d4f54f48b41069003f895458/yt_lg_80x80.png", ip, 3001))
+        assertFalse(WebOsClient.isResourceUrl("http://192.168.8.219:3001/resources/a/b.png", ip, 3001))     // http
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.220:3001/resources/a/b.png", ip, 3001))    // 다른 호스트
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219:3000/resources/a/b.png", ip, 3001))    // 다른 포트
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219/resources/a/b.png", ip, 3001))         // 포트 없음
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219:3001/other/b.png", ip, 3001))          // 경로
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219:3001/resources/../x", ip, 3001))
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219:3001/resources/%2E%2E/x", ip, 3001))
+        assertFalse(WebOsClient.isResourceUrl("https://192.168.8.219:3001/resources/a.png?x=1", ip, 3001))
+        assertFalse(WebOsClient.isResourceUrl("https://u@192.168.8.219:3001/resources/a.png", ip, 3001))
+        assertFalse(WebOsClient.isResourceUrl("not a url", ip, 3001))
+    }
+
+    @Test
+    fun fetchResourceRejectsWhenNotConnected() {
+        val c = WebOsClient(object : WebOsClient.Listener {
+            override fun onState(tag: String, state: String, message: String) {}
+            override fun onRegistered(tag: String, clientKey: String, certSha256: String?) {}
+            override fun onResponse(tag: String, reqId: String, ok: Boolean, payload: JSONObject?, error: String?) {}
+            override fun onKeyRejected(tag: String) {}
+            override fun onCertMismatch(tag: String, actualSha256: String?) {}
+            override fun onPointerError(tag: String, message: String) {}
+        })
+        var err: String? = null
+        c.fetchResource("https://192.168.8.219:3001/resources/a/b.png", 1000) { _, _, e -> err = e }
+        assertEquals("연결 안 됨", err)
+    }
 }
