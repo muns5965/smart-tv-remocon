@@ -753,7 +753,7 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
     else if (type === "theme") window.setTheme(!!d.dark);
     else if (type === "icon") onIcon(d);
     else if (type === "cast") {                      // 어떤 화면이 열렸는지 표시 (실기 확인용)
-      var names = { cast_settings: "안드로이드 화면 전송 설정", smart_view: "Smart View", display_settings: "디스플레이 설정" };
+      var names = { cast_settings: "Google Cast 설정", smart_view: "Smart View", smart_view_dialog: "Smart View", display_settings: "디스플레이 설정" };
       castMsg = d.via === "none" ? "화면 전송 화면을 열 수 없습니다" : "열림: " + (names[d.via] || d.via);
       if (S.page === "debug") logLine("화면 전송 결과: " + d.via);
       toast(castMsg);                                 // 설정 화면으로 넘어가 못 볼 수 있어 돌아왔을 때 한 번 더

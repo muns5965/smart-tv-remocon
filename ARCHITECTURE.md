@@ -100,7 +100,7 @@
 | `castTargets()` | 없음 (디버그) | 동기: Smart View 앱의 화면 목록 `{launch, version, activities:[{name, exported, enabled}]}` |
 | `openCastTarget(className)` | Smart View 패키지의 화면 이름 (디버그) | `cast {via:"sv:<이름>"\|"none"}` |
 | `haptic()` | 없음 | 버튼 터치 진동 (`performHapticFeedback`, 시스템 터치 피드백 설정을 따름) |
-| `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (삼성 Smart View → 안드로이드 화면 전송 설정 → 디스플레이 설정 순. 삼성 폰에서 화면 전송 설정은 'Google Cast'로 열림 — 실기 확인) | `cast {via}` |
+| `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (Smart View 팝업 `CastingDialog` → Smart View 화면 `CastingActivity` → Smart View 실행 인텐트 → 안드로이드 화면 전송 설정 → 디스플레이 설정 순. 삼성 폰에서 화면 전송 설정은 'Google Cast'로 열림 — 실기 확인 2026-11-04) | `cast {via}` |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
 

@@ -199,20 +199,35 @@ class AndroidBridge(
 
     /**
      * 화면 미러링 / DeX: 일반 앱은 Miracast·DeX를 직접 시작할 수 없으므로 시스템 화면 전송 화면을 연다.
-     * 순서: 삼성 Smart View 앱 → 안드로이드 화면 전송 설정 → 디스플레이 설정.
-     * (삼성 폰에서 화면 전송 설정은 'Google Cast'로 열려 Smart View·DeX로 가지 않으므로 Smart View를 먼저 — 실기 확인)
+     * 순서: Smart View 팝업(CastingDialog) → Smart View 화면(CastingActivity) → Smart View 실행 인텐트
+     *       → 안드로이드 화면 전송 설정 → 디스플레이 설정.
+     * 실기 확인 (Galaxy S26 Ultra, 2026-11-04): 화면 전송 설정은 'Google Cast'로 열려 Smart View·DeX로 가지 않음.
+     * CastingDialog = 빠른 설정의 Smart View와 같은 팝업, CastingActivity = 전체 화면 기기 목록.
+     * 화면 이름은 패키지 경로가 바뀔 수 있어 끝 이름으로 찾는다 (공개된 화면만).
      * 결과는 이벤트 cast {via}: cast_settings | smart_view | display_settings | none (실기 확인용으로 화면에 표시)
      */
     @JavascriptInterface
     fun openCastSettings() {
         activity.runOnUiThread {
-            val via = activity.packageManager.getLaunchIntentForPackage(SMART_VIEW_PKG)
+            val via = smartViewIntent("CastingDialog")?.let { tryStart(it, "smart_view_dialog") }
+                ?: smartViewIntent("CastingActivity")?.let { tryStart(it, "smart_view") }
+                ?: activity.packageManager.getLaunchIntentForPackage(SMART_VIEW_PKG)
                     ?.let { tryStart(it, "smart_view") }
                 ?: tryStart(Intent(Settings.ACTION_CAST_SETTINGS), "cast_settings")
                 ?: tryStart(Intent(Settings.ACTION_DISPLAY_SETTINGS), "display_settings")
                 ?: "none"
             emit("cast", JSONObject().put("via", via))
         }
+    }
+
+    /** Smart View 패키지에서 끝 이름이 [simpleName]인 공개 화면을 여는 인텐트 (없으면 null) */
+    private fun smartViewIntent(simpleName: String): Intent? = try {
+        @Suppress("DEPRECATION")
+        activity.packageManager.getPackageInfo(SMART_VIEW_PKG, PackageManager.GET_ACTIVITIES)
+            .activities?.firstOrNull { it.exported && it.enabled && it.name.substringAfterLast('.') == simpleName }
+            ?.let { Intent().setComponent(ComponentName(SMART_VIEW_PKG, it.name)) }
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
     }
 
     private fun tryStart(intent: Intent, name: String): String? = try {
