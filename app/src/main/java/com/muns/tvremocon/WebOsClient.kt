@@ -136,7 +136,7 @@ class WebOsClient(
      * TV 리소스(앱·입력 아이콘) 받기. TV는 아이콘을 리모컨 통신과 같은 https://<TV>:3001/resources/… 로 준다 (실TV 확인).
      * WebView는 TV 자체 서명 인증서를 믿지 않으므로 여기서 받는다.
      * 조건: 연결된 현재 세션, [isResourceUrl] (https·같은 호스트·같은 포트·/resources/), 리디렉션 안 따름,
-     * 응답 200·image 형식, 최대 [maxBytes]. 인증서는 세션 클라이언트가 저장된 지문으로 확인.
+     * 응답 200, 내용이 PNG·JPEG·GIF·WebP 시그니처([sniffImage]), 최대 [maxBytes]. 인증서는 세션 클라이언트가 저장된 지문으로 확인.
      * @param cb (bytes, contentType, error) — OkHttp 스레드에서 호출
      */
     fun fetchResource(url: String, maxBytes: Int, cb: (ByteArray?, String?, String?) -> Unit) {
@@ -162,13 +162,14 @@ class WebOsClient(
                 response.use { r ->
                     if (!live(s)) { cb(null, null, "TV가 바뀜"); return }
                     if (r.code != 200) { cb(null, null, "HTTP ${r.code}"); return }
-                    val type = r.header("Content-Type").orEmpty().substringBefore(';').trim().lowercase()
-                    if (!type.startsWith("image/")) { cb(null, null, "그림이 아님: $type"); return }
+                    // 실TV는 Content-Type을 보내지 않음 (2026-11-04 확인) → 헤더 대신 파일 앞부분(시그니처)으로 판단
                     val body = r.body ?: run { cb(null, null, "본문 없음"); return }
                     if (body.contentLength() > maxBytes) { cb(null, null, "너무 큼: ${body.contentLength()}"); return }
                     val src = body.source()
                     if (src.request(maxBytes.toLong() + 1)) { cb(null, null, "너무 큼"); return }   // 최대 크기 + 1바이트까지만 읽어 판단
-                    cb(src.buffer.readByteArray(), type, null)
+                    val bytes = src.buffer.readByteArray()
+                    val type = sniffImage(bytes) ?: run { cb(null, null, "그림이 아님 (PNG·JPEG·GIF·WebP 아님)"); return }
+                    cb(bytes, type, null)
                 }
             }
         })
@@ -513,6 +514,18 @@ class WebOsClient(
             val path = u.rawPath ?: return false
             if (!path.startsWith("/resources/") || path.contains("..") || path.contains("%2e", ignoreCase = true)) return false
             return true
+        }
+
+        /** 그림 형식 판단 (파일 시그니처). 모르는 형식이면 null */
+        fun sniffImage(b: ByteArray): String? {
+            fun at(i: Int, vararg v: Int) = b.size >= i + v.size && v.indices.all { (b[i + it].toInt() and 0xFF) == v[it] }
+            return when {
+                at(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) -> "image/png"
+                at(0, 0xFF, 0xD8, 0xFF) -> "image/jpeg"
+                at(0, 0x47, 0x49, 0x46, 0x38) -> "image/gif"
+                at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50) -> "image/webp"
+                else -> null
+            }
         }
 
         const val REGISTER_ID = "register_0"

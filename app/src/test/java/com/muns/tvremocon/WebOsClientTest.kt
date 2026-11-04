@@ -498,4 +498,16 @@ class WebOsClientTest {
         c.fetchResource("https://192.168.8.219:3001/resources/a/b.png", 1000) { _, _, e -> err = e }
         assertEquals("연결 안 됨", err)
     }
+
+    @Test
+    fun sniffImageBySignature() {
+        fun b(vararg v: Int) = ByteArray(v.size) { v[it].toByte() }
+        assertEquals("image/png", WebOsClient.sniffImage(b(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0)))
+        assertEquals("image/jpeg", WebOsClient.sniffImage(b(0xFF, 0xD8, 0xFF, 0xE0)))
+        assertEquals("image/gif", WebOsClient.sniffImage("GIF89a".toByteArray()))
+        assertEquals("image/webp", WebOsClient.sniffImage("RIFF\u0000\u0000\u0000\u0000WEBPVP8 ".toByteArray()))
+        assertNull(WebOsClient.sniffImage("<html>".toByteArray()))
+        assertNull(WebOsClient.sniffImage(b(0x89, 0x50)))
+        assertNull(WebOsClient.sniffImage(ByteArray(0)))
+    }
 }

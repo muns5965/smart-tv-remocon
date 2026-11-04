@@ -66,7 +66,8 @@
 ### 리소스(아이콘) — 실TV 확인 (2026-11-04)
 - 앱·입력 아이콘 주소: `https://<TV_IP>:3001/resources/<해시>/<파일>.png` — 리모컨 통신과 **같은 호스트·포트, 같은 자체 서명 인증서**.
 - WebView는 이 인증서를 믿지 않아 직접 못 연다 → Kotlin `fetchResource`가 세션 클라이언트(지문 확인)로 받아 data: URI로 넘긴다.
-- 받는 조건: https·현재 TV 호스트·3001·`/resources/` 경로, 리디렉션 안 따름, `image/*`, 최대 256KB.
+- 받는 조건: https·현재 TV 호스트·3001·`/resources/` 경로, 리디렉션 안 따름, 최대 256KB.
+- 실TV는 아이콘 응답에 `Content-Type`을 보내지 않는다 → 형식은 파일 시그니처(PNG·JPEG·GIF·WebP)로 판단.
 
 ### 확인된 URI
 
