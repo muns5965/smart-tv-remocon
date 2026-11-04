@@ -89,6 +89,8 @@ body.mode-pad .dpad{display:none}
 .row4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .row3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .row4 button,.row3 button{height:46px;display:flex;align-items:center;justify-content:center}
+.row4 button{height:56px;flex-direction:column;gap:2px}
+.row4 button span{font-size:11px;color:var(--mut)}
 .power-wrap{display:flex;justify-content:center;margin-top:auto;padding-top:4px}
 .power{width:62px;height:62px;border-radius:31px;background:var(--card);color:var(--err);display:flex;align-items:center;justify-content:center}
 .power.armed{background:var(--err);color:#fff}
@@ -176,7 +178,7 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
   <symbol id="i-return" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
   <symbol id="i-input" viewBox="0 0 24 24"><path d="M4 9h16v4l-2 3H6l-2-3z"/><path d="M8 12h8M9 9V5M15 9V5"/></symbol>
-  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   <symbol id="i-rew" viewBox="0 0 24 24"><path d="M11 6v12L3 12zM20 6v12l-8-6z"/></symbol>
   <symbol id="i-ff" viewBox="0 0 24 24"><path d="M4 6v12l8-6zM13 6v12l8-6z"/></symbol>
   <symbol id="i-pp" viewBox="0 0 24 24"><path d="M4 6v12l8-6z"/><rect x="14" y="6" width="2.5" height="12" rx="1"/><rect x="18.5" y="6" width="2.5" height="12" rx="1"/></symbol>
@@ -238,10 +240,10 @@ input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--
       </div>
     </div>
     <div class="row4">
-      <button data-btn="BACK" aria-label="뒤로"><svg class="ico"><use href="#i-return"/></svg></button>
-      <button data-btn="HOME" aria-label="홈"><svg class="ico"><use href="#i-home"/></svg></button>
-      <button data-act="inputs" aria-label="외부입력"><svg class="ico"><use href="#i-input"/></svg></button>
-      <button data-btn="MENU" aria-label="TV 설정"><svg class="ico"><use href="#i-gear"/></svg></button>
+      <button data-btn="BACK"><svg class="ico" style="width:20px;height:20px"><use href="#i-return"/></svg><span>뒤로</span></button>
+      <button data-btn="HOME"><svg class="ico" style="width:20px;height:20px"><use href="#i-home"/></svg><span>홈</span></button>
+      <button data-act="inputs"><svg class="ico" style="width:20px;height:20px"><use href="#i-input"/></svg><span>입력</span></button>
+      <button data-btn="MENU" aria-label="TV 설정"><svg class="ico" style="width:20px;height:20px;stroke-width:1.7"><use href="#i-gear"/></svg><span>설정</span></button>
     </div>
     <div class="row3">
       <button data-req="ssap://media.controls/rewind" aria-label="되감기"><svg class="ico fill"><use href="#i-rew"/></svg></button>

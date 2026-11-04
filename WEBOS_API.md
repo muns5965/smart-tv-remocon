@@ -103,6 +103,7 @@ name:UP
 
 ```
 - 실TV ✅ (2026-10-19, 앱): `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` 동작 확인
+- 실TV ✅ (2026-11-04, 앱): `MENU` → TV 설정 메뉴가 열림
 - 버튼 이름: `UP` `DOWN` `LEFT` `RIGHT` `ENTER` `BACK` `HOME` `EXIT` `MENU` `INFO` `LIST` `0`~`9` `DASH` `RED` `GREEN` `YELLOW` `BLUE` (공개 앱 코드)
 - 클릭: `type:click\n\n` **단독으로는 실TV 무반응** (2026-10-19). 직전에 `type:move`를 보내야 동작:
   `type:move\ndx:1\ndy:0\ndown:0\n\n` → 30ms 뒤 `type:click\n\n` — 실TV ✅ (`lg_pointer_test.py`의 `click2`)
