@@ -5,161 +5,253 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>TV 리모컨</title>
 <style>
+/* One UI 스타일 (2차 시안). 라이트가 기본, html[data-theme=dark]는 Kotlin이 시스템 설정에 맞춰 붙인다 */
 :root{
-  --bg:#111317; --panel:#1a1d23; --key:#252932; --key-hi:#2f3440; --line:#2d313a;
-  --fg:#e8eaee; --mut:#8d95a3; --acc:#ff4d7d; --ok:#4ade80; --warn:#fbbf24; --err:#f87171;
+  --bg:#f2f2f4; --card:#ffffff; --key:#f1f3f6; --pad:#e8ebf0; --press:#dde1e7; --line:#ececf0;
+  --tint:#dbe8fd; --tint-fg:#1a5fc8; --acc:#1f6fe5; --acc-press:#1a5fc8;
+  --fg:#111111; --mut:#5a5f66; --ok:#1e8e3e; --warn:#b26a00; --err:#d93025; --dim:rgba(0,0,0,.38); --toast:#222;
+  color-scheme:light;
+}
+html[data-theme=dark]{
+  --bg:#000000; --card:#1c1c1c; --key:#2c2c2c; --pad:#333333; --press:#454545; --line:#2a2a2a;
+  --tint:#1b3a66; --tint-fg:#9cc4ff; --acc:#1f6fe5; --acc-press:#3a82ef;
+  --fg:#fafafa; --mut:#b3b3b3; --ok:#3ddc84; --warn:#fbbf24; --err:#ff6b6b; --dim:rgba(0,0,0,.6); --toast:#3a3a3a;
+  color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--fg);
   font:15px/1.4 system-ui,-apple-system,"Noto Sans KR",sans-serif;user-select:none;-webkit-user-select:none}
-.wrap{max-width:440px;margin:0 auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom))}
-/* 상단 한 줄: TV 이름 · 상태 · 설정 */
-.top{display:flex;align-items:center;gap:8px;margin:4px 0 12px}
-.top .who{flex:1;min-width:0;background:none;padding:4px 0;text-align:left;font-size:17px;font-weight:700;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:6px}
-.top .who:active{background:none;transform:none;opacity:.7}
-.gear{width:38px;height:38px;font-size:18px;border-radius:50%;flex:none}
-.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
-.pill::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mut);margin-right:6px;vertical-align:1px}
-.pill.on{color:var(--ok)} .pill.on::before{background:var(--ok)}
-.pill.wait{color:var(--warn)} .pill.wait::before{background:var(--warn)}
-.pill.bad{color:var(--err)} .pill.bad::before{background:var(--err)}
-
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
-button{font:inherit;color:var(--fg);background:var(--key);border:0;border-radius:12px;cursor:pointer;touch-action:manipulation}
-button:active{background:var(--key-hi);transform:scale(.97)}
+button{font:inherit;color:var(--fg);background:var(--key);border:0;border-radius:18px;cursor:pointer;touch-action:manipulation;padding:0}
+button:active{background:var(--press)}
 button:disabled{opacity:.45}
-.btn-acc{background:var(--acc);color:#fff;padding:10px 16px;font-weight:600}
-.btn-acc:active{background:#e23d6b}
-.btn-sm{padding:7px 12px;font-size:13px}
-.label{font-size:12px;color:var(--mut);margin:0 0 8px 2px}
+svg{display:block;flex:none}
+.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ico.fill{fill:currentColor;stroke:none}
 
-/* 방향키 | 터치패드 전환 */
-.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;margin:0 auto;max-width:220px}
-.seg button{flex:1;padding:6px;font-size:13px;background:transparent;border-radius:8px;color:var(--mut)}
-.seg button.on{background:var(--key-hi);color:var(--fg)}
-.pad{display:none;width:100%;max-width:230px;aspect-ratio:1;margin:0 auto;border-radius:18px;background:var(--key);border:1px dashed var(--line);
-  touch-action:none;align-items:center;justify-content:center;text-align:center;color:var(--mut);font-size:12px;line-height:1.7}
-.pad.active{background:var(--key-hi)}
+.wrap{max-width:460px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;gap:12px;
+  padding:calc(8px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.bar{height:52px;display:flex;align-items:center;gap:4px;padding-left:8px}
+.bar h1{flex:1;margin:0;font-size:22px;font-weight:700}
+.icon-btn{width:48px;height:48px;border-radius:24px;background:transparent;display:flex;align-items:center;justify-content:center;flex:none}
+.card{background:var(--card);border-radius:26px}
+
+/* TV 카드: 이름 · 모델 · 상태 */
+.tvcard{display:flex;align-items:center;gap:14px;padding:14px 16px;text-align:left;background:var(--card);border-radius:26px;width:100%}
+.tvcard:active{background:var(--press)}
+.tvcard .badge{width:48px;height:48px;border-radius:24px;background:var(--tint);color:var(--tint-fg);display:flex;align-items:center;justify-content:center;flex:none}
+.tvcard .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.tvcard b{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvcard small{font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{display:flex;align-items:center;gap:6px}
+.status::before{content:"";width:7px;height:7px;border-radius:4px;background:var(--mut);flex:none}
+.status.on::before{background:var(--ok)} .status.wait::before{background:var(--warn)} .status.bad::before{background:var(--err)}
+.chev{color:var(--mut)}
+
+/* 앱 바로 실행: 옆으로 넘기는 한 줄 */
+.apps-card{padding:12px 4px 12px 12px}
+.card-h{margin:0 0 8px 4px;font-size:13px;font-weight:600;color:var(--mut)}
+.apps{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-right:8px}
+.apps::-webkit-scrollbar{display:none}
+.app{width:68px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;padding:4px 0;border-radius:16px}
+.app .mono{width:46px;height:46px;border-radius:15px;background:var(--key);color:var(--mut);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700}
+.app span:last-child{font-size:12px;white-space:nowrap;max-width:66px;overflow:hidden;text-overflow:ellipsis}
+
+/* 조작 카드 */
+.ctrl{padding:12px 12px 14px;display:flex;flex-direction:column;gap:12px}
+.seg{display:flex;background:var(--key);border-radius:22px;padding:4px;gap:4px}
+.seg button{flex:1;height:36px;border-radius:18px;background:transparent;color:var(--mut);font-size:14px;font-weight:500}
+.seg button.on{background:var(--tint);color:var(--tint-fg);font-weight:700}
+.middle{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.rocker{width:58px;height:172px;border-radius:29px;background:var(--pad);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 0}
+.rocker button{width:54px;height:54px;border-radius:27px;background:transparent;display:flex;align-items:center;justify-content:center}
+.rocker button:active{background:var(--press)}
+.rocker .mid{width:46px;height:40px;border-radius:20px;color:var(--mut)}
+.rocker span{font-size:12px;color:var(--mut)}
+.dpad{position:relative;width:180px;height:180px;border-radius:90px;background:var(--pad);flex:none}
+.dpad button{position:absolute;background:transparent;border-radius:28px;display:flex;align-items:center;justify-content:center}
+.dpad button:active{background:var(--press)}
+.dpad .u{left:63px;top:3px;width:54px;height:56px}
+.dpad .d{left:63px;bottom:3px;width:54px;height:56px}
+.dpad .l{top:63px;left:3px;width:56px;height:54px}
+.dpad .r{top:63px;right:3px;width:56px;height:54px}
+.dpad .ok{left:56px;top:56px;width:68px;height:68px;border-radius:34px;background:var(--acc);color:#fff;font-size:15px;font-weight:700}
+.dpad .ok:active{background:var(--acc-press)}
+.pad{display:none;width:180px;height:180px;border-radius:32px;background:var(--pad);touch-action:none;flex:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);font-size:12px;line-height:1.6;text-align:center}
+.pad.active{background:var(--press)}
 body.mode-pad .pad{display:flex}
 body.mode-pad .dpad{display:none}
-/* 설정 시트 */
-.tvrow{display:flex;align-items:center;gap:8px;background:var(--key);border-radius:12px;padding:10px 12px}
-.tvrow .t{flex:1;min-width:0}
-.tvrow .t b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tvrow .t small{color:var(--mut)}
-.list .tvrow button{background:var(--key-hi);width:auto;flex:none;display:inline-block;padding:7px 12px;text-align:center}
-.tvrow .danger{color:var(--err)}
-.tvrow .danger.armed{background:var(--err);color:#fff}
-.sect{font-size:12px;color:var(--mut);margin:14px 0 8px 2px}
-/* PIN 숫자판 (시스템 키보드 대신) */
-.pinbox{font:600 26px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:6px;text-align:center;padding:12px;
-  background:var(--bg);border:1px solid var(--line);border-radius:12px;min-height:56px;margin:4px 0 12px;word-break:break-all}
-.pinbox.empty{font:15px/1.9 inherit;letter-spacing:0;color:var(--mut)}
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.keypad button{height:52px;font-size:22px;font-weight:600}
-.keypad .ok{background:var(--acc);color:#fff;font-size:16px}
-.keypad .ok:active{background:#e23d6b}
-.speed{display:flex;align-items:center;gap:10px}
-.speed input{flex:1;padding:0}
-input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px;font:inherit;user-select:text;-webkit-user-select:text}
-
-.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.app{height:54px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;line-height:1.2}
-
-.middle{display:grid;grid-template-columns:64px 1fr 64px;gap:12px;align-items:center;margin:10px 0 14px}
-.rocker{display:flex;flex-direction:column;background:var(--key);border-radius:32px;overflow:hidden}
-.rocker button{background:transparent;height:64px;border-radius:0;font-size:24px}
-.rocker button:active{background:var(--key-hi)}
-.rocker span{text-align:center;font-size:11px;color:var(--mut);padding:2px 0}
-
-.dpad{position:relative;width:100%;max-width:230px;aspect-ratio:1;margin:0 auto;border-radius:50%;background:var(--key)}
-.dpad button{position:absolute;background:transparent;border-radius:0;font-size:22px;color:var(--mut)}
-.dpad button:active{color:var(--fg);background:rgba(255,255,255,.06)}
-.dpad .u{top:0;left:30%;width:40%;height:30%}
-.dpad .d{bottom:0;left:30%;width:40%;height:30%}
-.dpad .l{left:0;top:30%;width:30%;height:40%}
-.dpad .r{right:0;top:30%;width:30%;height:40%}
-.dpad .ok{top:30%;left:30%;width:40%;height:40%;border-radius:50%;background:var(--key-hi);color:var(--fg);font-size:16px;font-weight:700}
-
-.row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.row button{height:48px;font-size:14px}
-.power{color:var(--err);font-weight:700}
+.row4,.row3{display:grid;gap:8px}
+.row4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.row3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.row4 button,.row3 button{height:46px;display:flex;align-items:center;justify-content:center}
+.power-wrap{display:flex;justify-content:center;margin-top:auto;padding-top:4px}
+.power{width:62px;height:62px;border-radius:31px;background:var(--card);color:var(--err);display:flex;align-items:center;justify-content:center}
 .power.armed{background:var(--err);color:#fff}
 
-/* 아래에서 올라오는 시트: TV 선택, 허용 대기, PIN, 인증서 경고 */
-.dim{position:fixed;inset:0;background:#0009;display:none;z-index:10}
-.dim.show{display:block}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--panel);border-top:1px solid var(--line);
-  border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(105%);transition:.22s;max-height:80vh;overflow:auto}
-.sheet.show{transform:translateY(0)}
-.sheet h2{font-size:17px;margin:0 0 6px}
-.sheet p{color:var(--mut);margin:0 0 12px;font-size:14px}
-.sheet .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
-.list{display:flex;flex-direction:column;gap:8px}
-.list button{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;width:100%}
-.list .t{flex:1;min-width:0}
-.list .t b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.list .t small{color:var(--mut)}
-.list .tag{font-size:11px;color:var(--ok)}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--mut);border-top-color:transparent;border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px;margin-right:6px}
+/* 전체 화면 페이지: TV 연결, 설정, 디버그 */
+.page{position:fixed;inset:0;z-index:8;background:var(--bg);overflow:auto;transform:translateX(100%);transition:transform .22s;visibility:hidden}
+.page.show{transform:none;visibility:visible}
+.page .inner{max-width:460px;margin:0 auto;padding:calc(8px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.sect{display:flex;align-items:center;justify-content:space-between;margin:10px 4px 0 12px;font-size:14px;font-weight:700;color:var(--mut);min-height:24px}
+.list{background:var(--card);border-radius:26px;padding:4px;display:flex;flex-direction:column}
+.item{display:flex;align-items:center;gap:14px;min-height:60px;padding:10px 14px;border-radius:22px;background:transparent;text-align:left;width:100%}
+.item + .item{position:relative}
+.item + .item::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:var(--line)}
+.item .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.item .t b{font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .t small{font-size:13px;color:var(--mut)}
+.item.sel{background:var(--tint)} .item.sel + .item::before{display:none}
+.item.sel .t small,.item.sel .tag{color:var(--tint-fg)}
+.tag{font-size:12px;color:var(--mut);white-space:nowrap}
+.tag.on{color:var(--tint-fg);font-weight:700}
+.item .mini{height:36px;padding:0 12px;border-radius:18px;font-size:13px;background:var(--key);flex:none}
+.item .danger{color:var(--err)}
+.item .danger.armed{background:var(--err);color:#fff}
+.hero{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px 0 4px;color:var(--tint-fg)}
+.hero p{margin:0;font-size:14px;line-height:1.6;color:var(--mut);text-align:center}
+.iprow{background:var(--card);border-radius:26px;padding:12px;display:flex;gap:8px}
+input{flex:1;min-width:0;height:48px;background:var(--key);border:0;color:var(--fg);border-radius:18px;padding:0 14px;font:inherit;font-size:14px;user-select:text;-webkit-user-select:text}
+.btn-acc{background:var(--acc);color:#fff;font-weight:700;height:48px;padding:0 18px}
+.btn-acc:active{background:var(--acc-press)}
+.switch{width:46px;height:28px;border-radius:14px;background:#b9bec6;position:relative;flex:none;transition:.15s}
+.switch::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:11px;background:#fff;transition:.15s}
+.switch.on{background:var(--acc)} .switch.on::after{left:21px}
+.speed{display:flex;align-items:center;gap:10px;padding:0 14px 12px;font-size:13px;color:var(--mut)}
+.speed input{flex:1;height:28px;padding:0;background:transparent;accent-color:var(--acc)}
+.speed b{width:30px;text-align:right;color:var(--fg)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--mut);border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:18px;font-size:14px;color:var(--mut);text-align:center;line-height:1.6}
+
+/* 디버그 */
+.dbg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:var(--card);border-radius:26px;padding:12px}
+.dbg button{min-height:48px;padding:6px 10px;font-size:13px;line-height:1.3}
+.log{background:var(--card);border-radius:20px;padding:12px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;
+  min-height:160px;max-height:50vh;overflow:auto;user-select:text;-webkit-user-select:text}
+
+/* 아래에서 올라오는 시트: 허용 대기, PIN, 인증서 경고, 외부입력 */
+.dim{position:fixed;inset:0;background:var(--dim);display:none;z-index:10}
+.dim.show{display:block}
+.sheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:11;background:var(--card);
+  border-radius:28px;padding:10px 20px 16px;transform:translateY(120%);transition:.22s;max-height:86vh;overflow:auto;max-width:460px;margin:0 auto}
+.sheet.show{transform:translateY(0)}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
+.sheet h2{font-size:20px;margin:0 4px 6px}
+.sheet p{color:var(--mut);margin:0 4px 14px;font-size:14px;line-height:1.5}
+.sheet .acts{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:12px}
+.sheet .txt{background:transparent;height:44px;padding:0 12px;border-radius:22px;font-size:14px;color:var(--mut)}
+.sheet .txt.blue{color:var(--tint-fg);font-weight:700;font-size:15px}
+.sheet .list{background:var(--key);padding:4px}
+.pinbox{font:600 28px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:8px;text-align:center;padding:16px 8px;
+  background:var(--bg);border-radius:20px;min-height:64px;margin:0 0 12px;word-break:break-all}
+.pinbox.empty{font-family:inherit;font-size:15px;font-weight:400;line-height:2;letter-spacing:0;color:var(--mut)}
+.keypad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.keypad button{height:56px;font-size:22px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.keypad .ok{background:var(--acc);color:#fff;font-size:16px;font-weight:700}
+.keypad .ok:active{background:var(--acc-press)}
 
 .toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);z-index:20;
-  background:#000d;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
+  background:var(--toast);color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
 </style>
 </head>
 <body>
+<!-- 아이콘 모음 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M3 15V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/><path d="M3 18a2 2 0 0 1 2 2M3 14a6 6 0 0 1 6 6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 9l5 6M21 9l-5 6"/></symbol>
+  <symbol id="i-return" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
+  <symbol id="i-input" viewBox="0 0 24 24"><path d="M4 9h16v4l-2 3H6l-2-3z"/><path d="M8 12h8M9 9V5M15 9V5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-rew" viewBox="0 0 24 24"><path d="M11 6v12L3 12zM20 6v12l-8-6z"/></symbol>
+  <symbol id="i-ff" viewBox="0 0 24 24"><path d="M4 6v12l8-6zM13 6v12l8-6z"/></symbol>
+  <symbol id="i-pp" viewBox="0 0 24 24"><path d="M4 6v12l8-6z"/><rect x="14" y="6" width="2.5" height="12" rx="1"/><rect x="18.5" y="6" width="2.5" height="12" rx="1"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 10"/></symbol>
+  <symbol id="i-del" viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7z"/><path d="M12 9l5 6M17 9l-5 6"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10.5V9a1.5 1.5 0 0 1 3 0v2"/><path d="M15 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a5 5 0 0 1-4.2-2.3L4.5 15a1.5 1.5 0 0 1 2.4-1.8L9 15"/></symbol>
+</svg>
+
 <div class="wrap">
-  <header class="top">
-    <button class="who" id="tvName" data-act="pillTap">TV 리모컨</button>
-    <span id="pill" class="pill" data-act="pillTap">연결 안 됨</span>
-    <button class="gear" data-act="settings" aria-label="설정">⚙</button>
+  <header class="bar">
+    <h1>TV 리모컨</h1>
+    <button class="icon-btn" data-act="cast" aria-label="화면 미러링"><svg class="ico"><use href="#i-cast"/></svg></button>
+    <button class="icon-btn" data-act="settings" aria-label="설정"><svg class="ico fill"><use href="#i-more"/></svg></button>
   </header>
 
-  <div class="panel">
-    <p class="label">앱 바로 실행</p>
+  <button class="tvcard" data-act="tvcard">
+    <span class="badge"><svg class="ico" style="width:24px;height:24px"><use href="#i-tv"/></svg></span>
+    <span class="t">
+      <b id="tvName">TV 리모컨</b>
+      <small id="tvModel"></small>
+      <small id="status" class="status">연결 안 됨</small>
+    </span>
+    <svg class="ico chev" style="width:20px;height:20px"><use href="#i-chev"/></svg>
+  </button>
+
+  <section class="card apps-card">
+    <p class="card-h">앱 바로 실행</p>
     <div class="apps" id="apps"></div>
-  </div>
+  </section>
 
-  <div class="seg" id="seg">
-    <button data-mode="dpad">방향키</button>
-    <button data-mode="pad">터치패드</button>
-  </div>
-
-  <div class="middle">
-    <div class="rocker">
-      <button data-req="ssap://audio/volumeUp" data-repeat="1" aria-label="볼륨 올리기">＋</button>
-      <span>음량</span>
-      <button data-req="ssap://audio/volumeDown" data-repeat="1" aria-label="볼륨 내리기">－</button>
+  <section class="card ctrl">
+    <div class="seg" id="seg">
+      <button data-mode="dpad">방향키</button>
+      <button data-mode="pad">터치패드</button>
     </div>
-    <div class="dpad">
-      <button class="u" data-btn="UP" data-repeat="1" aria-label="위">▲</button>
-      <button class="l" data-btn="LEFT" data-repeat="1" aria-label="왼쪽">◀</button>
-      <button class="ok" data-btn="ENTER">확인</button>
-      <button class="r" data-btn="RIGHT" data-repeat="1" aria-label="오른쪽">▶</button>
-      <button class="d" data-btn="DOWN" data-repeat="1" aria-label="아래">▼</button>
+    <div class="middle">
+      <div class="rocker">
+        <button data-req="ssap://audio/volumeUp" data-repeat="1" aria-label="볼륨 올리기"><svg class="ico"><use href="#i-plus"/></svg></button>
+        <button class="mid" data-act="mute" aria-label="음소거"><svg class="ico" style="width:20px;height:20px"><use href="#i-mute"/></svg></button>
+        <button data-req="ssap://audio/volumeDown" data-repeat="1" aria-label="볼륨 내리기"><svg class="ico"><use href="#i-minus"/></svg></button>
+      </div>
+      <div class="dpad">
+        <button class="u" data-btn="UP" data-repeat="1" aria-label="위"><svg class="ico"><use href="#i-up"/></svg></button>
+        <button class="l" data-btn="LEFT" data-repeat="1" aria-label="왼쪽"><svg class="ico"><use href="#i-back"/></svg></button>
+        <button class="ok" data-btn="ENTER">확인</button>
+        <button class="r" data-btn="RIGHT" data-repeat="1" aria-label="오른쪽"><svg class="ico"><use href="#i-chev"/></svg></button>
+        <button class="d" data-btn="DOWN" data-repeat="1" aria-label="아래"><svg class="ico"><use href="#i-down"/></svg></button>
+      </div>
+      <div class="pad" id="pad">
+        <svg class="ico" style="width:30px;height:30px"><use href="#i-hand"/></svg>
+        <span>드래그 · 커서 이동<br>탭 · 클릭<br>두 손가락 위아래 · 스크롤</span>
+      </div>
+      <div class="rocker">
+        <button data-req="ssap://tv/channelUp" data-repeat="1" aria-label="채널 올리기"><svg class="ico"><use href="#i-up"/></svg></button>
+        <span>채널</span>
+        <button data-req="ssap://tv/channelDown" data-repeat="1" aria-label="채널 내리기"><svg class="ico"><use href="#i-down"/></svg></button>
+      </div>
     </div>
-    <div class="pad" id="pad">드래그: 커서 이동<br>탭: 클릭<br>두 손가락 위아래: 스크롤</div>
-    <div class="rocker">
-      <button data-req="ssap://media.controls/play" aria-label="재생">▶</button>
-      <span>재생</span>
-      <button data-req="ssap://media.controls/pause" aria-label="일시정지">❚❚</button>
+    <div class="row4">
+      <button data-btn="BACK" aria-label="뒤로"><svg class="ico"><use href="#i-return"/></svg></button>
+      <button data-btn="HOME" aria-label="홈"><svg class="ico"><use href="#i-home"/></svg></button>
+      <button data-act="inputs" aria-label="외부입력"><svg class="ico"><use href="#i-input"/></svg></button>
+      <button data-btn="MENU" aria-label="TV 설정"><svg class="ico"><use href="#i-gear"/></svg></button>
     </div>
-  </div>
+    <div class="row3">
+      <button data-req="ssap://media.controls/rewind" aria-label="되감기"><svg class="ico fill"><use href="#i-rew"/></svg></button>
+      <button data-act="playPause" aria-label="재생 / 일시정지"><svg class="ico fill"><use href="#i-pp"/></svg></button>
+      <button data-req="ssap://media.controls/fastForward" aria-label="빨리감기"><svg class="ico fill"><use href="#i-ff"/></svg></button>
+    </div>
+  </section>
 
-  <div class="row">
-    <button data-btn="BACK">뒤로</button>
-    <button data-btn="HOME">홈</button>
-    <button data-act="mute">음소거</button>
-    <button class="power" id="power" data-act="power">전원</button>
+  <div class="power-wrap">
+    <button class="power" id="power" data-act="power" aria-label="전원 끄기"><svg class="ico" style="width:26px;height:26px;stroke-width:2.2"><use href="#i-power"/></svg></button>
   </div>
-
-  <footer id="ver"></footer>
 </div>
 
+<div class="page" id="page"><div class="inner" id="pageInner"></div></div>
 <div class="dim" id="dim"></div>
 <div class="sheet" id="sheet"></div>
 <div class="toast" id="toast"></div>
@@ -187,9 +279,19 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     phase: "",           // 자동 흐름: "last"(마지막 TV 시도) → "discover"(검색) → ""
     searching: false,
     found: [],           // 이번 검색에서 찾은 TV
-    sheet: ""            // 열린 시트 종류
+    sheet: "",           // 열린 시트: prompt | pin | cert | inputs
+    page: ""             // 열린 페이지: connect | settings | debug
   };
   var seq = 0, pending = {};
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var haptic = load("haptic") !== "0";        // 터치 진동 (기본 켬)
+
+  // ------------------------------------------------------------ 테마 (Kotlin이 시스템 다크 모드를 알려 줌)
+  window.setTheme = function (dark) { document.documentElement.setAttribute("data-theme", dark ? "dark" : "light"); };
+  if (B && B.isDark) { try { window.setTheme(B.isDark()); } catch (e) {} }
+  else if (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) window.setTheme(true);
 
   // ------------------------------------------------------------ 공통 UI
   var toastTimer = null;
@@ -205,27 +307,31 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
+  function icon(id, cls) { return '<svg class="ico' + (cls ? " " + cls : "") + '"><use href="#i-' + id + '"/></svg>'; }
   function tvLabel(t) { return (t && (t.name || "").replace(/^\[LG\]\s*/, "")) || "LG TV"; }
+  function savedTvs() { try { return JSON.parse(B.savedTvs()); } catch (e) { return []; } }
+  function savedById(id) { return savedTvs().filter(function (t) { return t.id === id; })[0] || null; }
 
+  var STATUS = {
+    idle: ["연결 안 됨", ""], closed: ["연결 끊김", ""], failed: ["연결 실패", "bad"],
+    connecting: ["연결 중…", "wait"], prompt: ["TV에서 허용 대기", "wait"], pin: ["PIN 입력 대기", "wait"],
+    connected: ["연결됨", "on"]
+  };
   function render() {
-    var pill = $("pill"), c = S.conn;
-    var map = {
-      idle: ["연결 안 됨", ""], closed: ["연결 끊김", ""], failed: ["연결 실패", "bad"],
-      connecting: ["연결 중…", "wait"], prompt: ["TV에서 허용 대기", "wait"], pin: ["PIN 입력 대기", "wait"],
-      connected: ["연결됨", "on"]
-    };
-    var m = map[c] || map.idle;
+    var c = S.conn, m = STATUS[c] || STATUS.idle;
     if (S.searching && c !== "connected") m = ["TV 찾는 중…", "wait"];
-    pill.textContent = m[0];
-    pill.className = "pill " + m[1];
-    $("tvName").textContent = S.tv ? tvLabel(S.tv) : "TV 리모컨";
-    $("tvName").title = S.tv ? (S.tv.ip || "") : "";
+    var st = $("status");
+    st.textContent = m[0] + (S.tv && S.tv.ip ? " · " + S.tv.ip : "");
+    st.className = "status " + m[1];
+    $("tvName").textContent = S.tv ? tvLabel(S.tv) : "TV를 연결하세요";
+    var sv = S.tv && S.tv.id ? savedById(S.tv.id) : null;
+    $("tvModel").textContent = sv && sv.model ? sv.model : (S.tv ? "LG webOS TV" : "같은 Wi-Fi의 LG TV");
   }
 
-  // ------------------------------------------------------------ 시트
+  // ------------------------------------------------------------ 시트 (허용 대기, PIN, 인증서, 외부입력)
   function openSheet(kind, html) {
     S.sheet = kind;
-    $("sheet").innerHTML = html;
+    $("sheet").innerHTML = '<div class="grab"></div>' + html;
     $("sheet").classList.add("show");
     $("dim").classList.add("show");
   }
@@ -234,73 +340,99 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     $("sheet").classList.remove("show");
     $("dim").classList.remove("show");
   }
-  function showPicker() {
-    var saved = [];
-    try { saved = JSON.parse(B.savedTvs()); } catch (e) {}
+
+  // ------------------------------------------------------------ 페이지 (TV 연결, 설정, 디버그)
+  function openPage(kind, html) {
+    S.page = kind;
+    $("pageInner").innerHTML = html;
+    $("page").classList.add("show");
+  }
+  function closePage() {
+    S.page = "";
+    $("page").classList.remove("show");
+  }
+  function pageBar(title) {
+    return '<header class="bar" style="padding-left:0"><button class="icon-btn" data-act="closePage" aria-label="뒤로">' +
+      icon("back") + "</button><h1>" + esc(title) + "</h1></header>";
+  }
+
+  // TV 연결: 찾은 TV + 저장된 TV. 누르면 바로 연결
+  function showConnect() {
     var byId = {};
     S.found.forEach(function (t) { byId[t.id] = t; });
-    saved.forEach(function (t) { if (!byId[t.id]) byId[t.id] = t; });
+    savedTvs().forEach(function (t) { if (!byId[t.id]) byId[t.id] = t; });
     var items = Object.keys(byId).map(function (k) { return byId[k]; });
-    var html = "<h2>TV 선택</h2>";
-    html += S.searching ? '<p><span class="spin"></span>같은 Wi-Fi에서 찾는 중…</p>' : "<p>연결할 TV를 고르세요.</p>";
+    var html = pageBar("TV 연결");
+    html += '<div class="hero"><svg viewBox="0 0 24 24" class="ico" style="width:64px;height:64px;stroke-width:1.4"><use href="#i-tv"/></svg>' +
+      "<p>" + (S.searching ? '<span class="spin"></span> 같은 Wi-Fi에서 LG TV를 찾는 중…' : "목록에서 TV를 누르면 바로 연결합니다.") + "</p></div>";
+    html += '<div class="sect"><span>TV 목록</span><button class="icon-btn" data-act="find" aria-label="다시 찾기" style="width:44px;height:44px">' +
+      icon("refresh") + "</button></div>";
     html += '<div class="list">' + (items.length ? items.map(function (t) {
+      var cur = S.tv && S.tv.id === t.id && S.conn === "connected";
       var foundNow = S.found.some(function (f) { return f.id === t.id; });
-      return '<button data-pick="' + esc(t.id) + '"><span class="t"><b>' + esc(tvLabel(t)) + "</b><small>" +
-        esc(t.ip) + (t.model ? " · " + esc(t.model) : "") + (foundNow ? "" : " · 저장됨") + "</small></span>" +
-        (t.known ? '<span class="tag">연결한 적 있음</span>' : "") + "</button>";
-    }).join("") : (S.searching ? "" : "<p>찾은 TV가 없습니다. TV가 켜져 있는지, 같은 Wi-Fi인지 확인하거나 IP로 연결하세요.</p>")) + "</div>";
-    html += '<div class="acts"><button class="btn-sm" data-act="settings">IP 직접 입력</button>' +
-      '<button class="btn-sm" data-act="find">다시 찾기</button><button class="btn-sm" data-act="close">닫기</button></div>';
-    openSheet("picker", html);
+      return '<button class="item' + (cur ? " sel" : "") + '" data-pick="' + esc(t.id) + '">' + icon("tv") +
+        '<span class="t"><b>' + esc(tvLabel(t)) + "</b><small>" + esc(t.model ? t.model + " · " : "") + esc(t.ip) +
+        (foundNow ? "" : " · 저장됨") + "</small></span>" +
+        (cur ? '<span class="tag on">연결됨</span>' : (t.known ? '<span class="tag">연결한 적 있음</span>' : "")) + "</button>";
+    }).join("") : '<div class="empty">' + (S.searching ? "찾는 중…" :
+      "찾은 TV가 없습니다.<br>TV가 켜져 있는지, 같은 Wi-Fi인지 확인하거나 IP로 연결하세요.") + "</div>") + "</div>";
+    html += '<div class="sect">목록에 없으면</div><div class="iprow">' +
+      '<input id="ip" placeholder="IP 직접 입력 (예: 192.168.0.10)" inputmode="decimal" autocomplete="off" aria-label="TV IP 주소">' +
+      '<button class="btn-acc" data-act="connectIp">연결</button></div>';
+    var keep = S.page === "connect" ? $("ip") : null, ipVal = keep ? keep.value : "";
+    openPage("connect", html);
+    if (ipVal) $("ip").value = ipVal;
   }
-  // ⚙ 설정: 저장된 TV(연결·등록 해제), TV 찾기, IP 직접 입력, 커서 속도, 앱 정보
-  function showSettings(focusIp) {
-    var saved = [];
-    try { saved = JSON.parse(B.savedTvs()); } catch (e) {}
-    var html = "<h2>설정</h2>";
-    html += '<p class="sect">저장된 TV</p><div class="list">' + (saved.length ? saved.map(function (t) {
+
+  // 설정: 연결된 TV, 저장된 TV(연결·등록 해제), 리모컨, 화면, 디버그, 정보
+  function showSettings() {
+    var saved = savedTvs();
+    var html = pageBar("설정");
+    html += '<div class="sect">연결 및 기기</div><div class="list">' +
+      '<button class="item" data-act="tvcard"><span class="t"><b>연결된 TV</b><small>' +
+      esc(S.conn === "connected" && S.tv ? tvLabel(S.tv) + " · " + S.tv.ip : "없음 · 눌러서 연결") + "</small></span>" + icon("chev", "chev") + "</button></div>";
+    html += '<div class="sect">저장된 TV</div><div class="list">' + (saved.length ? saved.map(function (t) {
       var isCur = S.tv && S.tv.id === t.id && S.conn === "connected";
-      return '<div class="tvrow"><span class="t"><b>' + esc(tvLabel(t)) + "</b><small>" + esc(t.ip) +
+      return '<div class="item"><span class="t"><b>' + esc(tvLabel(t)) + "</b><small>" + esc(t.ip) +
         (t.model ? " · " + esc(t.model) : "") + (isCur ? " · 연결됨" : "") + "</small></span>" +
-        (isCur ? "" : '<button class="btn-sm" data-conn="' + esc(t.id) + '">연결</button>') +
-        '<button class="btn-sm danger" data-forget="' + esc(t.id) + '">등록 해제</button></div>';
-    }).join("") : '<p>아직 없습니다.</p>') + "</div>";
-    html += '<p class="sect">TV 추가</p><div style="display:flex;gap:8px">' +
-      '<button class="btn-sm" data-act="find" style="flex:none">TV 찾기</button>' +
-      '<input id="ip" placeholder="IP 직접 입력 (예: 192.168.0.10)" inputmode="decimal" autocomplete="off">' +
-      '<button class="btn-acc btn-sm" data-act="connectIp">연결</button></div>';
-    html += '<p class="sect">폰 화면을 TV로 (미러링 · DeX)</p>' +
-      '<button class="btn-sm" data-act="cast" style="width:100%;padding:11px">화면 미러링 열기</button>' +
-      '<p class="hint" style="font-size:12px;color:var(--mut);margin:6px 2px 0">폰의 화면 전송(삼성: Smart View)이 열립니다. 이 TV를 고르면 미러링되고, ' +
-      '삼성 폰은 연결 후 DeX를 선택할 수 있습니다. TV 조작은 이 앱에서 그대로 됩니다.</p>';
-    html += '<p class="sect">터치패드 커서 속도</p><div class="speed"><span>느림</span>' +
-      '<input type="range" id="speed" min="0.6" max="3" step="0.1" value="' + speed + '"><span>빠름</span>' +
-      '<b id="speedv" style="width:34px;text-align:right">' + speed.toFixed(1) + "</b></div>";
-    html += '<p class="sect">' + esc($("ver").textContent) + "</p>";
-    html += '<div class="acts"><button class="btn-sm" data-act="close">닫기</button></div>';
-    openSheet("settings", html);
-    if (focusIp) setTimeout(function () { var i = $("ip"); if (i) i.focus(); }, 50);
+        (isCur ? "" : '<button class="mini" data-conn="' + esc(t.id) + '">연결</button>') +
+        '<button class="mini danger" data-forget="' + esc(t.id) + '">등록 해제</button></div>';
+    }).join("") : '<div class="empty">아직 없습니다.</div>') + "</div>";
+    html += '<div class="sect">리모컨</div><div class="list">' +
+      '<button class="item" data-act="toggleHaptic"><span class="t"><b>터치 진동</b><small>버튼을 누르면 짧게 진동</small></span>' +
+      '<span class="switch' + (haptic ? " on" : "") + '" id="hapticSw"></span></button>' +
+      '<div class="item" style="padding-bottom:4px"><span class="t"><b>터치패드 커서 속도</b></span></div>' +
+      '<div class="speed"><span>느림</span><input type="range" id="speed" min="0.6" max="3" step="0.1" value="' + speed +
+      '" aria-label="커서 속도"><span>빠름</span><b id="speedv">' + speed.toFixed(1) + "</b></div></div>";
+    html += '<div class="sect">화면</div><div class="list">' +
+      '<button class="item" data-act="cast"><span class="t"><b>화면 미러링</b><small>Smart View · DeX 열기</small></span>' + icon("chev", "chev") + "</button>" +
+      '<div class="item"><span class="t"><b>테마</b><small>시스템 설정을 따름 (라이트 / 다크)</small></span></div></div>';
+    html += '<div class="sect">개발</div><div class="list">' +
+      '<button class="item" data-act="debug"><span class="t"><b>API 테스트 (디버그)</b><small>채널 · 외부입력 · MENU 등 실TV 응답 확인</small></span>' + icon("chev", "chev") + "</button></div>";
+    html += '<div class="sect">정보</div><div class="list"><div class="item"><span class="t"><b>앱 정보</b><small>' +
+      esc(verText) + "</small></span></div></div>";
+    openPage("settings", html);
   }
+
   function showPrompt() {
     openSheet("prompt", "<h2>TV 화면에서 '허용'을 눌러 주세요</h2><p>" + esc(tvLabel(S.tv)) +
       "에 연결 요청을 보냈습니다. 처음 한 번만 하면 됩니다.</p>" +
-      '<div class="acts"><button class="btn-sm" data-act="cancel">취소</button></div>');
+      '<div class="acts"><span></span><button class="txt blue" data-act="cancel">취소</button></div>');
   }
-  // 처음 등록: TV 화면에 뜬 숫자를 입력 (리모컨 불필요). 길이 제한 없음, 숫자만
-  // 숫자판으로 입력 (시스템 키보드를 띄우지 않음)
+  // 처음 등록: TV 화면에 뜬 숫자를 숫자판으로 입력 (시스템 키보드를 띄우지 않음). 길이 제한 없음
   var pinVal = "";
   function showPin(msg) {
     var wrong = msg && msg.indexOf("맞지 않") >= 0;
     pinVal = "";
     var keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(function (k) {
       return '<button data-key="' + k + '">' + k + "</button>";
-    }).join("") + '<button data-key="back" aria-label="지우기">⌫</button><button data-key="0">0</button>' +
+    }).join("") + '<button data-key="back" aria-label="지우기">' + icon("del") + '</button><button data-key="0">0</button>' +
       '<button class="ok" id="pinOk" data-act="sendPin">확인</button>';
     openSheet("pin", "<h2>TV 화면의 숫자 입력</h2><p>" +
       esc(wrong ? msg.replace(/[.\s]*$/, "") + ". 다시 입력하세요." : tvLabel(S.tv) + " 화면에 표시된 숫자를 입력하세요. 처음 한 번만 하면 됩니다.") + "</p>" +
       '<div class="pinbox" id="pinbox" aria-live="polite"></div><div class="keypad">' + keys + "</div>" +
-      '<div class="acts"><button class="btn-sm" data-act="usePrompt">숫자가 안 뜨면: TV에서 허용</button>' +
-      '<button class="btn-sm" data-act="cancel">취소</button></div>');
+      '<div class="acts"><button class="txt" data-act="usePrompt">숫자가 안 뜨면: TV에서 허용</button>' +
+      '<button class="txt blue" data-act="cancel">취소</button></div>');
     renderPin();
   }
   function renderPin() {
@@ -321,8 +453,128 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     openSheet("cert", "<h2>TV 인증서가 바뀌었습니다</h2><p>" + esc(who) +
       "의 보안 인증서가 지난번과 다릅니다. TV를 초기화·업데이트했다면 정상일 수 있습니다.</p>" +
       "<p>다시 등록을 누르면 <b>TV 화면에 숫자</b>가 떠야 합니다. 숫자가 안 뜨면 다른 기기일 수 있으니 취소하세요.</p>" +
-      '<div class="acts"><button class="btn-sm" data-act="close">취소</button>' +
-      '<button class="btn-acc btn-sm" data-act="acceptCert">다시 등록</button></div>');
+      '<div class="acts"><button class="txt" data-act="close">취소</button>' +
+      '<button class="btn-acc" data-act="acceptCert">다시 등록</button></div>');
+  }
+
+  // ------------------------------------------------------------ 외부입력 패널
+  // 목록: ssap://tv/getExternalInputList (실TV 미확인) → 실패하면 HDMI 1~3 기본 목록
+  // 현재 입력: getForegroundAppInfo의 appId (com.webos.app.hdmi1 …)
+  // 전환: switchInput {inputId} → 실패하면 같은 입력의 앱(appId)을 실행 (실TV 확인된 경로)
+  var inputs = [], curApp = "";
+  var LIVE = { id: "", label: "TV 방송", appId: "com.webos.app.livetv" };
+  function defaultInputs() {
+    return [1, 2, 3].map(function (n) { return { id: "HDMI_" + n, label: "HDMI " + n, appId: "com.webos.app.hdmi" + n }; });
+  }
+  function showInputs() {
+    if (!connectedOrWarn()) return;
+    inputs = []; curApp = "";
+    renderInputs(true);
+    rq("ssap://tv/getExternalInputList", null, function (d) {
+      var devs = d.ok && d.payload && d.payload.devices;
+      inputs = (devs && devs.length) ? devs.map(function (v) {
+        return { id: v.id, label: v.label || v.id, appId: v.appId || "", connected: v.connected };
+      }) : defaultInputs();
+      if (S.sheet === "inputs") renderInputs(false, !(devs && devs.length));
+    }, true);
+    rq("ssap://com.webos.applicationManager/getForegroundAppInfo", null, function (d) {
+      curApp = (d.ok && d.payload && d.payload.appId) || "";
+      if (S.sheet === "inputs" && inputs.length) renderInputs(false);
+    }, true);
+  }
+  var inputsFallback = false;
+  function renderInputs(loading, fallback) {
+    if (fallback != null) inputsFallback = fallback;
+    var all = [LIVE].concat(inputs);
+    var html = "<h2>외부입력</h2><p>" + esc(tvLabel(S.tv)) + (inputsFallback ? " · TV 목록을 못 받아 기본 목록 표시" : "") + "</p>";
+    html += '<div class="list">' + (loading ? '<div class="empty"><span class="spin"></span> 입력 목록을 받는 중…</div>' :
+      all.map(function (v, i) {
+        var sel = curApp && v.appId && curApp === v.appId;
+        return '<button class="item' + (sel ? " sel" : "") + '" data-input="' + i + '">' + icon(i === 0 ? "tv" : "input") +
+          '<span class="t"><b>' + esc(v.label) + "</b>" + (v.connected === false ? "<small>연결된 기기 없음</small>" : "") + "</span>" +
+          (sel ? '<span style="color:var(--tint-fg)">' + icon("check") + "</span>" : "") + "</button>";
+      }).join("")) + "</div>";
+    html += '<div class="acts"><span></span><button class="txt blue" data-act="close">닫기</button></div>';
+    if (S.sheet === "inputs") { $("sheet").innerHTML = '<div class="grab"></div>' + html; }
+    else openSheet("inputs", html);
+  }
+  function pickInput(i) {
+    var v = [LIVE].concat(inputs)[i];
+    if (!v) return;
+    closeSheet();
+    function launch() {
+      if (!v.appId) { toast("전환 실패: " + v.label); return; }
+      call("ssap://system.launcher/launch", { id: v.appId }, function (r) { if (r.ok) toast(v.label + "(으)로 전환"); });
+    }
+    if (!v.id) return launch();                                   // TV 방송은 앱 실행으로
+    rq("ssap://tv/switchInput", { inputId: v.id }, function (d) {
+      if (d.ok) toast(v.label + "(으)로 전환");
+      else launch();                                              // switchInput이 안 되면 입력 앱 실행
+    }, true);
+  }
+
+  // ------------------------------------------------------------ 디버그: 실TV에서 아직 확인 안 된 API를 눌러 보고 응답 원문 보기
+  var DEBUG_TESTS = [
+    { t: "MENU 버튼 (TV 설정)", btn: "MENU" },
+    { t: "INFO 버튼", btn: "INFO" },
+    { t: "채널 ▲ channelUp", uri: "ssap://tv/channelUp" },
+    { t: "채널 ▼ channelDown", uri: "ssap://tv/channelDown" },
+    { t: "외부입력 목록", uri: "ssap://tv/getExternalInputList" },
+    { t: "현재 앱 / 입력", uri: "ssap://com.webos.applicationManager/getForegroundAppInfo" },
+    { t: "switchInput HDMI_1", uri: "ssap://tv/switchInput", p: { inputId: "HDMI_1" } },
+    { t: "switchInput HDMI_2", uri: "ssap://tv/switchInput", p: { inputId: "HDMI_2" } },
+    { t: "HDMI 1 앱 실행", uri: "ssap://system.launcher/launch", p: { id: "com.webos.app.hdmi1" } },
+    { t: "TV 방송 앱 실행", uri: "ssap://system.launcher/launch", p: { id: "com.webos.app.livetv" } },
+    { t: "되감기 rewind", uri: "ssap://media.controls/rewind" },
+    { t: "빨리감기 fastForward", uri: "ssap://media.controls/fastForward" },
+    { t: "재생 play", uri: "ssap://media.controls/play" },
+    { t: "일시정지 pause", uri: "ssap://media.controls/pause" },
+    { t: "앱 목록 (아이콘 주소)", uri: "ssap://com.webos.applicationManager/listLaunchPoints", sum: "launch" },
+    { t: "음량 상태", uri: "ssap://audio/getVolume" },
+    { t: "진동 테스트", act: "haptic" },
+    { t: "외부입력 패널 열기", act: "inputs" }
+  ];
+  var dbgLog = [];
+  function showDebug() {
+    var html = pageBar("API 테스트");
+    html += '<p class="sect" style="font-weight:500">TV에 연결한 뒤 눌러 보세요. 결과(성공 여부·응답 원문)가 아래에 쌓입니다.</p>';
+    html += '<div class="dbg">' + DEBUG_TESTS.map(function (x, i) {
+      return '<button data-dbg="' + i + '">' + esc(x.t) + "</button>";
+    }).join("") + "</div>";
+    html += '<div class="sect"><span>결과</span><button class="mini" data-act="dbgCopy" style="height:36px;padding:0 12px;font-size:13px">복사</button></div>' +
+      '<div class="log" id="dbgLog"></div>';
+    openPage("debug", html);
+    renderLog();
+  }
+  function logLine(s) {
+    var d = new Date();
+    var ts = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2);
+    dbgLog.unshift(ts + " " + s);
+    if (dbgLog.length > 60) dbgLog.length = 60;
+    renderLog();
+  }
+  function renderLog() { var el = $("dbgLog"); if (el) el.textContent = dbgLog.join("\n\n") || "(아직 없음)"; }
+  function summarize(x, payload) {
+    if (x.sum === "launch" && payload && payload.launchPoints) {
+      var lp = payload.launchPoints;
+      return "앱 " + lp.length + "개\n" + lp.slice(0, 8).map(function (a) {
+        return a.id + " | " + a.title + " | icon=" + (a.icon || a.largeIcon || "");
+      }).join("\n");
+    }
+    var s = JSON.stringify(payload);
+    return s && s.length > 900 ? s.slice(0, 900) + " …(" + s.length + "자)" : s;
+  }
+  function runDebug(i) {
+    var x = DEBUG_TESTS[i];
+    if (!x) return;
+    if (x.act === "haptic") { buzz(true); logLine("진동: haptic() 호출" + (B && B.haptic ? "" : " — 브리지에 없음")); return; }
+    if (x.act === "inputs") { closePage(); showInputs(); return; }
+    if (S.conn !== "connected") { logLine(x.t + ": TV에 연결되지 않음"); return; }
+    if (x.btn) { logLine(x.t + ": button(" + x.btn + ") → " + (B.button(x.btn) ? "전송" : "전송 실패")); return; }
+    logLine("→ " + x.t + "  " + x.uri + (x.p ? " " + JSON.stringify(x.p) : ""));
+    rq(x.uri, x.p || null, function (d) {
+      logLine("← " + x.t + ": " + (d.ok ? "성공 " + summarize(x, d.payload) : "실패 " + (d.error || "")));
+    }, true);
   }
 
   // ------------------------------------------------------------ 연결 흐름
@@ -336,14 +588,15 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     S.tv = { id: tv.id, ip: tv.ip, name: tv.name || "" };
     S.conn = "connecting";
     render();
+    if (S.page === "connect") showConnect();
     B.connect(tv.id);
   }
-  function startDiscover(showSheet) {
-    if (S.searching) { if (showSheet) showPicker(); return; }
+  function startDiscover(showPageToo) {
+    if (S.searching) { if (showPageToo) showConnect(); return; }
     S.searching = true;
     S.found = [];
     render();
-    if (showSheet) showPicker();
+    if (showPageToo || S.page === "connect") showConnect();
     B.discover();
   }
 
@@ -357,8 +610,9 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     switch (d.state) {
       case "connected":
         S.phase = "";
-        if (S.sheet && S.sheet !== "picker") closeSheet();
-        if (S.sheet === "picker") closeSheet();
+        if (S.sheet) closeSheet();
+        if (S.page === "connect") closePage();
+        else if (S.page === "settings") showSettings();
         if (prev !== "connected") toast(tvLabel(S.tv) + " 연결됨");
         break;
       case "prompt":
@@ -369,40 +623,42 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
         break;
       case "failed":
         if (d.code === "cert_changed") { S.phase = ""; showCertChanged(d); break; }
-        if (S.sheet === "prompt" || S.sheet === "pin") closeSheet();
+        if (S.sheet === "prompt" || S.sheet === "pin" || S.sheet === "inputs") closeSheet();
         if (S.phase === "last") {           // 마지막 TV 실패 → 자동 검색
           S.phase = "discover";
           startDiscover(false);
         } else {
           toast("연결 실패: " + (d.message || ""));
+          if (S.page === "connect") showConnect();
         }
         break;
       case "closed":
-        if (S.sheet === "prompt" || S.sheet === "pin") closeSheet();
+        if (S.sheet === "prompt" || S.sheet === "pin" || S.sheet === "inputs") closeSheet();
+        if (S.page === "connect") showConnect();
         break;
     }
   }
 
   function onFound(t) {
     if (!S.found.some(function (f) { return f.id === t.id; })) S.found.push(t);
-    if (S.sheet === "picker") showPicker();
+    if (S.page === "connect") showConnect();
   }
 
   function onDiscoverDone(d) {
     S.searching = false;
     render();
     if (S.conn === "connected" || S.conn === "connecting" || S.conn === "prompt" || S.conn === "pin") {
-      if (S.sheet === "picker") showPicker();
+      if (S.page === "connect") showConnect();
       return;
     }
     if (d.error) toast("검색 오류: " + d.error);
     var auto = S.phase === "discover";
     S.phase = "";
-    if (S.found.length === 1 && (auto || S.sheet !== "picker")) {
-      closeSheet();
+    if (S.found.length === 1 && (auto || S.page !== "connect")) {
+      if (S.page === "connect") closePage();
       connectTv(S.found[0]);
     } else {
-      showPicker();
+      showConnect();
     }
   }
 
@@ -417,7 +673,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       if (d.id && S.tv && S.tv.id && d.id !== S.tv.id) return;   // 다른 TV의 응답은 무시
       var p = pending[d.reqId];
       if (p) { delete pending[d.reqId]; clearTimeout(p.timer); p.cb(d); }
-    } else if (type === "error") toast(d.message || "오류");
+    } else if (type === "error") { toast(d.message || "오류"); if (S.page === "debug") logLine("오류 이벤트: " + (d.message || "")); }
+    else if (type === "theme") window.setTheme(!!d.dark);
     else if (type === "cast") {                      // 어떤 화면이 열렸는지 표시 (실기 확인용)
       var names = { cast_settings: "안드로이드 화면 전송 설정", smart_view: "Smart View", display_settings: "디스플레이 설정" };
       castMsg = d.via === "none" ? "화면 전송 화면을 열 수 없습니다" : "열림: " + (names[d.via] || d.via);
@@ -431,17 +688,27 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     toast(S.conn === "prompt" ? "TV에서 '허용'을 먼저 눌러 주세요" : "TV에 연결되지 않았습니다");
     return false;
   }
-  function call(uri, payload, cb) {
-    if (!connectedOrWarn()) return;
+  // ssap 요청. quiet면 실패 토스트 없이 결과만 cb로 (디버그·외부입력 대체 경로용)
+  function rq(uri, payload, cb, quiet) {
+    if (S.conn !== "connected") { if (!quiet) connectedOrWarn(); if (cb) cb({ ok: false, error: "연결 안 됨" }); return; }
     var id = "js_" + (++seq);
     pending[id] = {
       cb: function (d) {
-        if (!d.ok) toast("실패: " + (d.error || uri.replace("ssap://", "")));
+        if (!d.ok && !quiet) toast("실패: " + (d.error || uri.replace("ssap://", "")));
         if (cb) cb(d);
       },
-      timer: setTimeout(function () { if (pending[id]) { delete pending[id]; toast("TV 응답 없음"); } }, 8000)
+      timer: setTimeout(function () {
+        if (!pending[id]) return;
+        delete pending[id];
+        if (!quiet) toast("TV 응답 없음");
+        if (cb) cb({ ok: false, error: "응답 없음 (8초)" });
+      }, 8000)
     };
     B.request(id, uri, payload ? JSON.stringify(payload) : "");
+  }
+  function call(uri, payload, cb) {
+    if (!connectedOrWarn()) return;
+    rq(uri, payload, cb, false);
   }
   function press(name) {
     if (!connectedOrWarn()) return;
@@ -455,13 +722,18 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       call("ssap://audio/setMute", { mute: !muted }, function (r) { if (r.ok) toast(muted ? "음소거 해제" : "음소거"); });
     });
   }
+  // 재생/일시정지 한 버튼: TV에서 재생 상태를 받을 수 없어 번갈아 보낸다 (처음은 일시정지)
+  var paused = false;
+  function playPause() {
+    var uri = paused ? "ssap://media.controls/play" : "ssap://media.controls/pause";
+    call(uri, null, function (d) { if (d.ok) { paused = !paused; toast(paused ? "일시정지" : "재생"); } });
+  }
   var powerTimer = null;
   function power() {
     var b = $("power");
     if (!b.classList.contains("armed")) {
       if (!connectedOrWarn()) return;
       b.classList.add("armed");
-      b.textContent = "끄기?";
       toast("한 번 더 누르면 TV가 꺼집니다");
       powerTimer = setTimeout(disarm, 2500);
       return;
@@ -471,24 +743,24 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   }
   function disarm() {
     clearTimeout(powerTimer);
-    var b = $("power");
-    b.classList.remove("armed");
-    b.textContent = "전원";
+    $("power").classList.remove("armed");
+  }
+  function buzz(force) {
+    if ((haptic || force) && B && B.haptic) { try { B.haptic(); } catch (e) {} }
   }
 
   function act(b) {
     if (b.dataset.pick) {
       var id = b.dataset.pick;
-      var t = S.found.filter(function (f) { return f.id === id; })[0];
-      if (!t) { try { t = JSON.parse(B.savedTvs()).filter(function (f) { return f.id === id; })[0]; } catch (e) {} }
-      closeSheet();
-      if (t) connectTv(t);
+      var t = S.found.filter(function (f) { return f.id === id; })[0] || savedById(id);
+      if (!t) return;
+      if (S.tv && S.tv.id === id && S.conn === "connected") { closePage(); return; }
+      connectTv(t);
       return;
     }
     if (b.dataset.conn) {
-      var cid = b.dataset.conn, ct = null;
-      try { ct = JSON.parse(B.savedTvs()).filter(function (f) { return f.id === cid; })[0]; } catch (e) {}
-      closeSheet();
+      var ct = savedById(b.dataset.conn);
+      closePage();
       if (ct) connectTv(ct);
       return;
     }
@@ -510,22 +782,25 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
       if (pinCleared) { pinCleared = false; return; }   // 길게 눌러 전부 지운 직후의 클릭은 무시
       return pinKey(b.dataset.key);
     }
+    if (b.dataset.input) return pickInput(+b.dataset.input);
+    if (b.dataset.dbg) return runDebug(+b.dataset.dbg);
     if (b.dataset.mode) return setMode(b.dataset.mode);
     if (b.dataset.launch) return call("ssap://system.launcher/launch", { id: b.dataset.launch });
     if (b.dataset.req) return call(b.dataset.req, null);
     if (b.dataset.btn) return press(b.dataset.btn);
     switch (b.dataset.act) {
       case "find": startDiscover(true); break;
-      case "settings": showSettings(S.sheet === "picker"); break;
-      case "pillTap":
-        if (S.conn === "connected") showSettings();
-        else if (S.tv && S.tv.id) connectTv(S.tv);
-        else startDiscover(true);
+      case "settings": showSettings(); break;
+      case "debug": showDebug(); break;
+      case "closePage": closePage(); break;
+      case "tvcard":
+        if (S.conn !== "connected" && S.tv && S.tv.id && S.conn !== "connecting") connectTv(S.tv);
+        if (!S.searching && S.conn !== "connected") startDiscover(true); else showConnect();
         break;
       case "connectIp":
         var ipEl = $("ip"), ip = ipEl ? ipEl.value.trim() : "";
         if (!ip) { toast("IP를 입력하세요"); break; }
-        closeSheet();
+        closePage();
         clearPending();
         S.tv = { id: "", ip: ip, name: "" };
         S.conn = "connecting"; S.phase = "";
@@ -540,13 +815,23 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
         break;
       case "usePrompt": closeSheet(); if (S.tv && S.tv.id) { S.conn = "connecting"; render(); B.connectPrompt(S.tv.id); } break;
       case "acceptCert": closeSheet(); if (S.tv) { B.acceptCert(S.tv.id); connectTv(S.tv); } break;
+      case "inputs": showInputs(); break;
       case "mute": toggleMute(); break;
-      case "cast": if (B.openCastSettings) B.openCastSettings(); else toast("앱에서만 동작합니다"); break;
+      case "playPause": playPause(); break;
+      case "toggleHaptic":
+        haptic = !haptic; store("haptic", haptic ? "1" : "0");
+        var sw = $("hapticSw"); if (sw) sw.classList.toggle("on", haptic);
+        if (haptic) buzz();
+        break;
+      case "dbgCopy":
+        try { navigator.clipboard.writeText(dbgLog.join("\n\n")); toast("복사했습니다"); } catch (e) { toast("복사 실패"); }
+        break;
+      case "cast": if (B && B.openCastSettings) B.openCastSettings(); else toast("앱에서만 동작합니다"); break;
       case "power": power(); break;
     }
   }
 
-  // 탭 + 길게 누르면 반복 (볼륨, 방향키)
+  // 탭 + 길게 누르면 반복 (볼륨, 방향키, 채널)
   var rep = null;
   function stopRepeat() { if (rep) { clearTimeout(rep.t); clearInterval(rep.i); rep = null; } }
   document.addEventListener("click", function (ev) {
@@ -556,6 +841,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     act(b);
   });
   document.addEventListener("pointerdown", function (ev) {
+    var t = ev.target.closest && ev.target.closest(".wrap button, .keypad button");
+    if (t) buzz();                                       // 리모컨·숫자판 버튼만 진동
     var b = ev.target.closest("button[data-repeat]");
     if (!b) return;
     stopRepeat();
@@ -593,9 +880,11 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
     else if (e.key === "Backspace") pinKey("back");
   });
 
-  // 안드로이드 뒤로 키: 시트가 열려 있으면 닫기
+  // 안드로이드 뒤로 키: 시트 → 페이지(디버그는 설정으로) 순서로 닫기
   window.onBackKey = function () {
     if (S.sheet) { closeSheet(); return true; }
+    if (S.page === "debug") { showSettings(); return true; }
+    if (S.page) { closePage(); return true; }
     return false;
   };
 
@@ -608,9 +897,6 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   });
 
   // ------------------------------------------------------------ 방향키 | 터치패드
-  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-
   var speed = parseFloat(load("cursor_speed")) || 1.5;   // 손가락 1px → TV 1.5단위 (화면 가로 ≈ 600~650)
   document.addEventListener("input", function (e) {
     if (e.target.id !== "speed") return;
@@ -699,23 +985,22 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:16px}
   // ------------------------------------------------------------ 시작
   setMode(load("ctrl_mode") === "pad" ? "pad" : "dpad");
 
+  // 앱 아이콘: 지금은 첫 글자 (TV가 주는 아이콘은 디버그로 주소 형식을 확인한 뒤 적용)
   $("apps").innerHTML = FAVORITES.map(function (a) {
-    return '<button class="app" data-launch="' + esc(a.id) + '">' + esc(a.title) + "</button>";
+    return '<button class="app" data-launch="' + esc(a.id) + '"><span class="mono">' + esc(a.title.charAt(0).toUpperCase()) +
+      "</span><span>" + esc(a.title) + "</span></button>";
   }).join("");
 
+  var verText = "브라우저 미리보기";
   if (!B) {
-    $("ver").textContent = "브라우저 미리보기 · 앱에서만 TV에 연결됩니다";
     render();
     return;
   }
-  try { $("ver").textContent = "v" + JSON.parse(B.appInfo()).version; } catch (e) {}
+  try { var info = JSON.parse(B.appInfo()); verText = "v" + info.version + " (빌드 " + info.build + ")"; } catch (e) {}
 
   var lastId = "";
   try { lastId = B.lastTv(); } catch (e) {}
-  var lastTv = null;
-  if (lastId) {
-    try { lastTv = JSON.parse(B.savedTvs()).filter(function (t) { return t.id === lastId; })[0]; } catch (e) {}
-  }
+  var lastTv = lastId ? savedById(lastId) : null;
   if (lastTv) {                 // 1) 마지막 TV로 바로 연결
     S.phase = "last";
     connectTv(lastTv);

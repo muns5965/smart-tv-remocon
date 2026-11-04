@@ -38,7 +38,8 @@
 | 3 | `TvDiscovery`(SSDP): TV 자동 찾기 (2단계에 합침) | 완료 — 확인 도구로 실TV 확인, 앱 화면 표시는 확인 중 |
 | 3+ | 설정 시트 정리, 터치패드(커서 이동·탭 클릭·스크롤) | 구현·자동 테스트 완료 — 포인터 형식은 확인 도구로 실TV 확인, **앱 터치패드는 실TV 확인 중** |
 | 안정화 | 포인터 상태·요청 ID·FIFO, 세션 단일 잠금, 공유 OkHttp, 형식 검사 (검토 반영) | 구현·자동 테스트 완료 |
-| 이후 | 앱 전체 목록, 문자 입력, 외부입력, 전원 켜기(WoL), 다른 제조사 | 미정 |
+| 8 | One UI 화면(메인·TV 연결·설정 페이지, 라이트/다크), 외부입력 패널, 채널·되감기·빨리감기·MENU, 터치 진동, API 테스트(디버그) 페이지 | 구현 — **새 API는 디버그 페이지로 실TV 확인 중** |
+| 이후 | 앱 전체 목록·TV 아이콘, 문자 입력, 전원 켜기(WoL), PIN 카메라 읽기, 다른 제조사 | 미정 |
 
 ### 파일
 
@@ -52,12 +53,17 @@
 | `AndroidBridge.kt` | JS ↔ Kotlin, 위 클래스 연결 | 있음 |
 | `assets/index.html` | 화면, 자동 연결 흐름 | — |
 
-### 화면 구성 (index.html)
-- 상단 한 줄: TV 이름 · 상태 · ⚙. 상태를 누르면 끊겼을 때 다시 연결, 연결돼 있으면 설정
-- ⚙ 설정 시트: 저장된 TV(연결 / 두 번 눌러 등록 해제), TV 찾기, IP 직접 입력, 터치패드 커서 속도, 버전
-- 가운데: [방향키 | 터치패드] 전환 (선택은 localStorage `ctrl_mode`)
+### 화면 구성 (index.html, 8단계 One UI)
+- 테마: 라이트 기본, 시스템 다크 모드면 `html[data-theme=dark]` (Kotlin `isDark()` + `theme` 이벤트). 상태·내비게이션 바 색도 Kotlin이 맞춤
+- 메인: 제목줄(화면 미러링 · 설정) / TV 카드(이름·모델·상태, 누르면 TV 연결 페이지) / 앱 바로 실행(옆으로 넘김, 아이콘은 첫 글자) /
+  조작 카드 [방향키 | 터치패드] + 음량 로커(가운데 = 음소거) + 채널 로커 / 뒤로·홈·외부입력·TV 설정(MENU) / 되감기·재생⇄일시정지·빨리감기 / 전원(두 번 눌러 끄기)
+- 페이지(전체 화면, 뒤로 키로 닫음): TV 연결(찾은 TV + 저장된 TV, 누르면 바로 연결, IP 직접 입력), 설정(저장된 TV 연결·등록 해제, 터치 진동, 커서 속도, 화면 미러링, 앱 정보), API 테스트
+- 시트: 허용 대기, PIN 숫자판, 인증서 경고, 외부입력
+  - 외부입력: `getExternalInputList` 목록(실패 시 HDMI 1~3) + `getForegroundAppInfo`의 appId로 현재 입력 체크. 전환은 `switchInput {inputId}` → 실패하면 입력 앱(`com.webos.app.hdmi<n>`) 실행. TV 방송은 `com.webos.app.livetv` 실행
+- [방향키 | 터치패드] 선택은 localStorage `ctrl_mode`, 터치 진동은 `haptic`("0" = 끔)
   - 터치패드: 드래그 = 이동(속도 × 가속, 20ms마다 모아 전송), 탭 = 이동 1 → 30ms → 클릭, 두 손가락 위아래 24px마다 스크롤 ±10 (아래로 끌기 = 위쪽 내용)
   - 커서 속도 기본 1.5 (localStorage `cursor_speed`, 0.6~3.0)
+- 재생⇄일시정지: TV에서 재생 상태를 받지 않으므로 pause/play를 번갈아 보냄(처음은 pause)
 
 ### 자동 연결 흐름 (index.html)
 1. 마지막 TV(`lastTv()`)가 있으면 바로 `connect(id)`
@@ -89,6 +95,8 @@
 | `sendPin(pin)` | PIN 방식 TV | 실패 시 `state: pin` |
 | `acceptCert(id)` | 인증서 바뀐 TV 다시 등록 | 저장된 **지문과 client-key 모두 삭제** → 다음 `connect`는 PIN 새 등록 |
 | `forget(id)` | TV 삭제 | — |
+| `isDark()` | 없음 | 동기: 시스템 다크 모드 여부 |
+| `haptic()` | 없음 | 버튼 터치 진동 (`performHapticFeedback`, 시스템 터치 피드백 설정을 따름) |
 | `openCastSettings()` | 화면 미러링·DeX: 시스템 화면 전송 화면 열기 (안드로이드 화면 전송 설정 → 삼성 Smart View → 디스플레이 설정 순) | `cast {via}` |
 
 ### Kotlin → JS (`window.onBridge(type, dataJson)`)
@@ -100,6 +108,7 @@
 | `tvFound` | `{"id","ip","name","model","uuid","known"}` |
 | `discoverDone` | `{"count", "error"?}` |
 | `error` | `{"message"}` — 방향키 소켓 실패도 여기로 |
+| `theme` | `{"dark":true\|false}` — 시스템 다크 모드가 바뀜 |
 | `cast` | `{"via":"cast_settings"\|"smart_view"\|"display_settings"\|"none"}` — 어떤 화면이 열렸는지 |
 
 ### 화면 미러링 · Miracast · DeX (검토 결론)

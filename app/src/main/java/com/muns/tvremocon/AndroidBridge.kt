@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.Settings
+import android.view.HapticFeedbackConstants
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import org.json.JSONObject
@@ -30,9 +31,21 @@ class AndroidBridge(
     fun appInfo(): String = JSONObject()
         .put("version", BuildConfig.VERSION_NAME)
         .put("build", BuildConfig.VERSION_CODE)
-        .put("stage", 3)
+        .put("stage", 8)
         .put("pairing", "PIN")
         .toString()
+
+    /** 시스템 다크 모드 여부 (화면 테마). 바뀌면 theme 이벤트 */
+    @JavascriptInterface
+    fun isDark(): Boolean = MainActivity.isDark(activity)
+
+    /** 버튼 터치 진동: 시스템 '터치 피드백' 설정을 따른다 (권한 불필요) */
+    @JavascriptInterface
+    fun haptic() {
+        activity.runOnUiThread {
+            if (!released) webView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        }
+    }
 
     /** 저장된 TV 목록: [{id, ip, name, model, known}] */
     @JavascriptInterface
