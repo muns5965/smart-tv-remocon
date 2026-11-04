@@ -136,7 +136,7 @@ class WebOsClient(
      * TV 리소스(앱·입력 아이콘) 받기. TV는 아이콘을 리모컨 통신과 같은 https://<TV>:3001/resources/… 로 준다 (실TV 확인).
      * WebView는 TV 자체 서명 인증서를 믿지 않으므로 여기서 받는다.
      * 조건: 연결된 현재 세션, [isResourceUrl] (https·같은 호스트·같은 포트·/resources/), 리디렉션 안 따름,
-     * 응답 200·image/*, 최대 [maxBytes]. 인증서는 세션 클라이언트가 저장된 지문으로 확인.
+     * 응답 200·image 형식, 최대 [maxBytes]. 인증서는 세션 클라이언트가 저장된 지문으로 확인.
      * @param cb (bytes, contentType, error) — OkHttp 스레드에서 호출
      */
     fun fetchResource(url: String, maxBytes: Int, cb: (ByteArray?, String?, String?) -> Unit) {
